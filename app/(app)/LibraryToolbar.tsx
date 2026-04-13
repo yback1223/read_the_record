@@ -74,7 +74,7 @@ export default function LibraryToolbar({
         )}
       </form>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-end gap-2 self-end md:self-auto">
         <SizeSelect
           value={initialSize}
           onChange={(n) => pushParams({ size: String(n) })}
