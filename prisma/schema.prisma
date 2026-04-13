@@ -39,6 +39,7 @@ model Book {
   isbn       String?
   coverUrl   String?
   publisher  String?
+  reflection String      @default("")
   createdAt  DateTime    @default(now())
   recordings Recording[]
 

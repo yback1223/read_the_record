@@ -24,6 +24,34 @@ export async function GET(
   }
 }
 
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { userId } = await requireApproved();
+    const { id } = await params;
+    const body = await req.json();
+    if (typeof body?.reflection !== "string") {
+      return NextResponse.json(
+        { error: "reflection required" },
+        { status: 400 },
+      );
+    }
+    const book = await prisma.book.findFirst({ where: { id, userId } });
+    if (!book) {
+      return NextResponse.json({ error: "not found" }, { status: 404 });
+    }
+    const updated = await prisma.book.update({
+      where: { id },
+      data: { reflection: body.reflection },
+    });
+    return NextResponse.json(updated);
+  } catch (err) {
+    return authErrorResponse(err);
+  }
+}
+
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },

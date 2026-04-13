@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import BookshelfLoader from "@/components/BookshelfLoader";
+import ReflectionEditor from "./ReflectionEditor";
 
 type Recording = {
   id: string;
@@ -18,6 +19,7 @@ type Book = {
   author: string | null;
   coverUrl: string | null;
   publisher: string | null;
+  reflection: string;
   recordings: Recording[];
 };
 
@@ -373,6 +375,8 @@ export default function BookView({ bookId }: { bookId: string }) {
           </label>
         </div>
       </section>
+
+      <ReflectionEditor bookId={book.id} initial={book.reflection ?? ""} />
 
       {error && (
         <div className="fade-up rounded-lg border px-4 py-3 text-sm"
