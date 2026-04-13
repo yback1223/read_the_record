@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum ProfileStatus {
+  pending
+  approved
+  rejected
+}
+
+enum ProfileRole {
+  user
+  super_admin
+}
+
+model Profile {
+  userId     String        @id
+  email      String        @unique
+  status     ProfileStatus @default(pending)
+  role       ProfileRole   @default(user)
+  active     Boolean       @default(true)
+  createdAt  DateTime      @default(now())
+  approvedAt DateTime?
+
+  @@index([status])
+}
+
+model Book {
+  id         String      @id @default(cuid())
+  userId     String
+  title      String
+  author     String?
+  createdAt  DateTime    @default(now())
+  recordings Recording[]
+
+  @@index([userId, createdAt])
+}
+
+model Recording {
+  id         String   @id @default(cuid())
+  bookId     String
+  book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  audioPath  String
+  mimeType   String
+  transcript String
+  createdAt  DateTime @default(now())
+
+  @@index([bookId])
+}
