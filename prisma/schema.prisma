@@ -36,6 +36,9 @@ model Book {
   userId     String
   title      String
   author     String?
+  isbn       String?
+  coverUrl   String?
+  publisher  String?
   createdAt  DateTime    @default(now())
   recordings Recording[]
 

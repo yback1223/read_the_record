@@ -15,6 +15,8 @@ type Book = {
   id: string;
   title: string;
   author: string | null;
+  coverUrl: string | null;
+  publisher: string | null;
   recordings: Recording[];
 };
 
@@ -194,15 +196,27 @@ export default function BookView({ bookId }: { bookId: string }) {
 
   return (
     <div className="fade-up mx-auto flex w-full max-w-2xl flex-col gap-10 px-6 py-10 md:py-14">
-      <header className="flex flex-col gap-3">
+      <header className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
-              {book.author ?? "저자 미상"}
-            </p>
-            <h1 className="serif mt-2 text-[28px] leading-tight text-[color:var(--ink)] md:text-[34px]">
-              {book.title}
-            </h1>
+          <div className="flex min-w-0 items-start gap-4">
+            {book.coverUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={book.coverUrl}
+                alt=""
+                className="h-32 w-22 shrink-0 rounded-sm object-cover shadow-[0_8px_24px_-12px_rgba(70,50,20,0.35)]"
+                style={{ width: "5.5rem" }}
+              />
+            ) : null}
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
+                {book.author ?? "저자 미상"}
+                {book.publisher && ` · ${book.publisher}`}
+              </p>
+              <h1 className="serif mt-2 text-[28px] leading-tight text-[color:var(--ink)] md:text-[34px]">
+                {book.title}
+              </h1>
+            </div>
           </div>
           <button
             type="button"

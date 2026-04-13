@@ -24,11 +24,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const title = (body?.title ?? "").toString().trim();
     const author = (body?.author ?? "").toString().trim() || null;
+    const isbn = (body?.isbn ?? "").toString().trim() || null;
+    const coverUrl = (body?.coverUrl ?? "").toString().trim() || null;
+    const publisher = (body?.publisher ?? "").toString().trim() || null;
     if (!title) {
       return NextResponse.json({ error: "title required" }, { status: 400 });
     }
     const book = await prisma.book.create({
-      data: { title, author, userId },
+      data: { title, author, isbn, coverUrl, publisher, userId },
     });
     return NextResponse.json(book, { status: 201 });
   } catch (err) {
