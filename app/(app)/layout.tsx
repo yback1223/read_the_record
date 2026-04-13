@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import Shell from "@/components/Shell";
+import NavigationOverlay from "@/components/NavigationOverlay";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { ensureProfile } from "@/lib/auth";
 
@@ -19,6 +21,9 @@ export default async function AppLayout({
       userEmail={user.email}
       isSuperAdmin={profile.role === "super_admin"}
     >
+      <Suspense fallback={null}>
+        <NavigationOverlay />
+      </Suspense>
       {children}
     </Shell>
   );
