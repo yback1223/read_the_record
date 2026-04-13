@@ -32,8 +32,24 @@ export default function BookView({ bookId }: { bookId: string }) {
   const [error, setError] = useState("");
   const [language, setLanguage] = useState("ko");
 
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node)
+      ) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [menuOpen]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
@@ -226,13 +242,51 @@ export default function BookView({ bookId }: { bookId: string }) {
               </h1>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={deleteBook}
-            className="shrink-0 rounded-full border hairline px-3 py-1 text-[11px] text-[color:var(--ink-soft)] hover:text-[color:var(--danger)] hover:border-[color:var(--danger)]"
-          >
-            책 지우기
-          </button>
+          <div className="relative shrink-0" ref={menuRef}>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label="더보기"
+              aria-expanded={menuOpen}
+              className={`flex h-9 w-9 items-center justify-center rounded-full border hairline text-[color:var(--ink-muted)] hover:text-[color:var(--ink)] hover:border-[color:var(--rule-strong)] ${
+                menuOpen ? "border-[color:var(--rule-strong)] text-[color:var(--ink)]" : ""
+              }`}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <circle cx="3" cy="8" r="1.4" />
+                <circle cx="8" cy="8" r="1.4" />
+                <circle cx="13" cy="8" r="1.4" />
+              </svg>
+            </button>
+            <div
+              className={`absolute right-0 top-11 z-20 w-44 origin-top-right overflow-hidden rounded-lg border hairline bg-[color:var(--paper-2)] shadow-[0_18px_40px_-20px_rgba(70,50,20,0.3)] ${
+                menuOpen
+                  ? "pointer-events-auto scale-100 opacity-100"
+                  : "pointer-events-none scale-95 opacity-0"
+              }`}
+              style={{ transitionDuration: "200ms" }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  deleteBook();
+                }}
+                className="flex w-full items-center gap-2 px-4 py-3 text-left text-[12px] text-[color:var(--danger)] hover:bg-[color:var(--paper)]"
+              >
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M3 4h10M6 4V2.5h4V4M5 4l.6 9.5a1 1 0 0 0 1 1h2.8a1 1 0 0 0 1-1L11 4"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                책 지우기
+              </button>
+            </div>
+          </div>
         </div>
         <div className="h-px w-full bg-[color:var(--rule)]" />
       </header>

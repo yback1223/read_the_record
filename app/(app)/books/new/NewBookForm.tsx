@@ -108,7 +108,7 @@ export default function NewBookForm() {
           htmlFor="q"
           className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]"
         >
-          제목 검색
+          책 검색 · 제목 또는 작가
         </label>
         <div className="relative">
           <input
@@ -119,7 +119,7 @@ export default function NewBookForm() {
               setQuery(e.target.value);
               if (picked) setPicked(null);
             }}
-            placeholder="책 제목을 입력해 보세요"
+            placeholder="제목이나 작가 이름을 입력해 보세요"
             className="w-full rounded-lg border hairline bg-[color:var(--paper)] px-4 py-3 text-base"
           />
           {picked && (
