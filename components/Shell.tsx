@@ -2,15 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import SignOutButton from "@/components/SignOutButton";
 
-type BookListItem = {
-  id: string;
-  title: string;
-  author: string | null;
-  coverUrl: string | null;
-  _count: { recordings: number };
+type NavItem = {
+  href: string;
+  label: string;
+  match: (path: string) => boolean;
+  icon: React.ReactNode;
 };
 
 export default function Shell({
@@ -23,31 +22,65 @@ export default function Shell({
   isSuperAdmin?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [books, setBooks] = useState<BookListItem[]>([]);
-  const pathname = usePathname();
-
-  const load = useCallback(async () => {
-    const res = await fetch("/api/books", { cache: "no-store" });
-    if (res.ok) setBooks(await res.json());
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load, pathname]);
+  const pathname = usePathname() ?? "/";
 
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
 
-  const currentBookId =
-    pathname?.startsWith("/books/") && !pathname.startsWith("/books/new")
-      ? pathname.split("/")[2]
-      : null;
+  const items: NavItem[] = [
+    {
+      href: "/",
+      label: "서재",
+      match: (p) => p === "/" || p.startsWith("/books"),
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path
+            d="M2 3h4.5a1.5 1.5 0 0 1 1.5 1.5V13a1.5 1.5 0 0 0-1.5-1.5H2V3zm12 0H9.5A1.5 1.5 0 0 0 8 4.5V13a1.5 1.5 0 0 1 1.5-1.5H14V3z"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+    },
+    {
+      href: "/books/new",
+      label: "책 담기",
+      match: (p) => p === "/books/new",
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path
+            d="M8 3v10M3 8h10"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+        </svg>
+      ),
+    },
+  ];
+
+  const adminItem: NavItem = {
+    href: "/admin",
+    label: "관리자",
+    match: (p) => p.startsWith("/admin"),
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+        <path
+          d="M8 1.5l6 2.5v4.5c0 3.5-2.4 5.7-6 6-3.6-.3-6-2.5-6-6V4l6-2.5z"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  };
 
   return (
     <div className="flex min-h-dvh">
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r hairline bg-[color:var(--paper-2)] md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r hairline bg-[color:var(--paper-2)] md:static md:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         } md:!translate-x-0`}
         style={{
@@ -56,94 +89,36 @@ export default function Shell({
           transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
         }}
       >
-        <div className="flex h-16 items-center justify-between px-6">
+        <div className="flex h-16 items-center px-6">
           <Link
             href="/"
-            className="serif text-lg tracking-wide text-[color:var(--ink)]"
+            className="serif text-lg tracking-[0.04em] text-[color:var(--ink)]"
           >
-            서재
-          </Link>
-          <Link
-            href="/books/new"
-            className={`rounded-full border hairline px-3 py-1 text-xs ${
-              pathname === "/books/new"
-                ? "border-[color:var(--accent)] text-[color:var(--accent)]"
-                : "text-[color:var(--ink-muted)] hover:text-[color:var(--ink)] hover:border-[color:var(--rule-strong)]"
-            }`}
-          >
-            + 책 추가
+            Read The Record
           </Link>
         </div>
 
-        {isSuperAdmin && (
-          <Link
-            href="/admin"
-            className={`mx-4 mb-2 flex items-center justify-between rounded-lg border hairline px-4 py-2.5 text-[12px] tracking-wide ${
-              pathname?.startsWith("/admin")
-                ? "border-[color:var(--accent)] text-[color:var(--accent)]"
-                : "text-[color:var(--ink)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)]"
-            }`}
-            style={{ background: "color-mix(in oklab, var(--accent) 6%, transparent)" }}
-          >
-            <span className="flex items-center gap-2">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M8 1.5l6 2.5v4.5c0 3.5-2.4 5.7-6 6-3.6-.3-6-2.5-6-6V4l6-2.5z"
-                  stroke="currentColor"
-                  strokeWidth="1.3"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              관리자 페이지
-            </span>
-            <span aria-hidden>→</span>
-          </Link>
-        )}
+        <div className="mx-6 h-px bg-[color:var(--rule)]" />
 
-        <div className="mx-6 my-2 h-px bg-[color:var(--rule)]" />
-
-        <nav className="flex flex-col gap-0.5 overflow-y-auto px-3 pb-3">
-          {books.length === 0 && (
-            <p className="px-3 py-4 text-xs italic text-[color:var(--ink-soft)]">
-              아직 서재에 책이 없어요.
-            </p>
-          )}
-          {books.map((b) => {
-            const active = b.id === currentBookId;
-            return (
-              <Link
-                key={b.id}
-                href={`/books/${b.id}`}
-                className={`group flex items-start gap-3 rounded-lg px-3 py-2.5 ${
-                  active
-                    ? "bg-[color:var(--paper)] shadow-[inset_2px_0_0_0_var(--accent)]"
-                    : "hover:bg-[color:var(--paper)]"
-                }`}
-              >
-                {b.coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={b.coverUrl}
-                    alt=""
-                    className="h-12 w-8 shrink-0 rounded-sm object-cover"
-                  />
-                ) : (
-                  <div className="h-12 w-8 shrink-0 rounded-sm border hairline bg-[color:var(--paper)]" />
-                )}
-                <div className="min-w-0 flex-1">
-                <span className="serif block truncate text-[15px] leading-snug text-[color:var(--ink)]">
-                  {b.title}
-                </span>
-                <span className="mt-0.5 block truncate text-[11px] text-[color:var(--ink-soft)]">
-                  {b.author ?? "저자 미상"} · 녹음 {b._count.recordings}
-                </span>
-                </div>
-              </Link>
-            );
-          })}
+        <nav className="flex flex-col gap-1 px-4 pt-5">
+          {items.map((it) => (
+            <NavLink key={it.href} item={it} active={it.match(pathname)} />
+          ))}
         </nav>
 
-        <div className="mt-auto border-t hairline px-5 py-4">
+        {isSuperAdmin && (
+          <>
+            <div className="mx-6 mt-5 h-px bg-[color:var(--rule)]" />
+            <p className="px-6 pt-4 text-[10px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
+              관리
+            </p>
+            <nav className="flex flex-col gap-1 px-4 pt-2">
+              <NavLink item={adminItem} active={adminItem.match(pathname)} />
+            </nav>
+          </>
+        )}
+
+        <div className="mt-auto border-t hairline px-6 py-5">
           <p className="truncate text-[11px] text-[color:var(--ink-soft)]">
             {userEmail}
           </p>
@@ -155,7 +130,9 @@ export default function Shell({
 
       <div
         className={`fixed inset-0 z-30 bg-black/30 md:hidden ${
-          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          open
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
         }`}
         onClick={() => setOpen(false)}
         style={{ transitionProperty: "opacity", transitionDuration: "300ms" }}
@@ -178,10 +155,30 @@ export default function Shell({
               />
             </svg>
           </button>
-          <span className="serif text-base tracking-wide">서재</span>
+          <span className="serif text-base tracking-[0.04em]">
+            Read The Record
+          </span>
         </header>
         <main className="flex-1 min-w-0">{children}</main>
       </div>
     </div>
+  );
+}
+
+function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+  return (
+    <Link
+      href={item.href}
+      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] tracking-wide ${
+        active
+          ? "bg-[color:var(--paper)] text-[color:var(--accent)] shadow-[inset_2px_0_0_0_var(--accent)]"
+          : "text-[color:var(--ink-muted)] hover:bg-[color:var(--paper)] hover:text-[color:var(--ink)]"
+      }`}
+    >
+      <span className="flex h-5 w-5 items-center justify-center">
+        {item.icon}
+      </span>
+      {item.label}
+    </Link>
   );
 }
