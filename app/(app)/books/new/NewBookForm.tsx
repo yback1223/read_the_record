@@ -1,8 +1,59 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import BookshelfLoader from "@/components/BookshelfLoader";
+
+const PLACEHOLDER_HINTS = [
+  "데미안",
+  "한강",
+  "사피엔스",
+  "헤르만 헤세",
+  "코스모스",
+  "무라카미 하루키",
+  "어린 왕자",
+];
+
+function useTypewriterPlaceholder(words: string[], paused: boolean) {
+  const [text, setText] = useState("");
+
+  useEffect(() => {
+    if (paused) return;
+    let wordIdx = 0;
+    let charIdx = 0;
+    let typing = true;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const tick = () => {
+      const word = words[wordIdx];
+      if (typing) {
+        charIdx += 1;
+        setText(word.slice(0, charIdx));
+        if (charIdx >= word.length) {
+          typing = false;
+          timer = setTimeout(tick, 1400);
+          return;
+        }
+        timer = setTimeout(tick, 110);
+      } else {
+        charIdx -= 1;
+        setText(word.slice(0, charIdx));
+        if (charIdx <= 0) {
+          typing = true;
+          wordIdx = (wordIdx + 1) % words.length;
+          timer = setTimeout(tick, 280);
+          return;
+        }
+        timer = setTimeout(tick, 55);
+      }
+    };
+
+    timer = setTimeout(tick, 400);
+    return () => clearTimeout(timer);
+  }, [words, paused]);
+
+  return text;
+}
 
 type SearchItem = {
   title: string;
@@ -23,6 +74,10 @@ export default function NewBookForm() {
   const [manualAuthor, setManualAuthor] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const typewriter = useTypewriterPlaceholder(
+    PLACEHOLDER_HINTS,
+    query.length > 0,
+  );
 
   async function runSearch() {
     const q = query.trim();
@@ -148,8 +203,8 @@ export default function NewBookForm() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="제목이나 작가 이름을 입력하고 Enter"
-            className="flex-1 rounded-lg border hairline bg-[color:var(--paper)] px-4 py-3 text-base"
+            placeholder={typewriter ? `${typewriter}|` : "|"}
+            className="flex-1 rounded-lg border hairline bg-[color:var(--paper)] px-4 py-3 text-base placeholder:text-[color:var(--ink-soft)]"
           />
           <button
             type="button"
@@ -162,7 +217,7 @@ export default function NewBookForm() {
           </button>
         </div>
         <p className="text-[11px] text-[color:var(--ink-soft)]">
-          두 글자 이상 입력 후 Enter 또는 검색 버튼
+          두 글자 이상 · Enter 또는 검색
         </p>
       </div>
 
