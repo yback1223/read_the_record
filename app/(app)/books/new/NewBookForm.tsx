@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import BookshelfLoader from "@/components/BookshelfLoader";
 
@@ -15,71 +15,70 @@ type SearchItem = {
 export default function NewBookForm() {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [lastSearched, setLastSearched] = useState("");
   const [results, setResults] = useState<SearchItem[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
   const [picked, setPicked] = useState<SearchItem | null>(null);
   const [manualAuthor, setManualAuthor] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const reqIdRef = useRef(0);
 
-  useEffect(() => {
-    if (picked) return;
+  async function runSearch() {
     const q = query.trim();
-    if (q.length < 2) {
-      setResults([]);
-      return;
-    }
-    const id = ++reqIdRef.current;
+    if (q.length < 2 || searching) return;
     setSearching(true);
-    const t = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `/api/books/search?q=${encodeURIComponent(q)}`,
-          { cache: "no-store" },
-        );
-        if (id !== reqIdRef.current) return;
-        if (res.ok) {
-          const data = await res.json();
-          setResults(data.items ?? []);
-        }
-      } finally {
-        if (id === reqIdRef.current) setSearching(false);
+    setSearchError("");
+    setResults([]);
+    setPicked(null);
+    setLastSearched(q);
+    try {
+      const res = await fetch(
+        `/api/books/search?q=${encodeURIComponent(q)}`,
+        { cache: "no-store" },
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setSearchError(data.error ?? "검색 실패");
+        return;
       }
-    }, 250);
-    return () => clearTimeout(t);
-  }, [query, picked]);
+      const data = await res.json();
+      setResults(data.items ?? []);
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : "검색 실패");
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      runSearch();
+    }
+  }
 
   function pick(item: SearchItem) {
     setPicked(item);
-    setQuery(item.title);
-    setResults([]);
   }
 
   function clearPick() {
     setPicked(null);
-    setQuery("");
-    setManualAuthor("");
   }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const title = picked?.title ?? query.trim();
+    const title = picked?.title ?? "";
     if (!title) return;
     setBusy(true);
     setError("");
-    const payload = picked
-      ? {
-          title: picked.title,
-          author: picked.author,
-          isbn: picked.isbn,
-          coverUrl: picked.cover,
-          publisher: picked.publisher,
-        }
-      : {
-          title,
-          author: manualAuthor.trim() || null,
-        };
+    const payload = {
+      title: picked!.title,
+      author: picked!.author,
+      isbn: picked!.isbn,
+      coverUrl: picked!.cover,
+      publisher: picked!.publisher,
+    };
     const res = await fetch("/api/books", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -96,13 +95,45 @@ export default function NewBookForm() {
     router.refresh();
   }
 
+  async function saveManual() {
+    if (!manualAuthor && !lastSearched) return;
+    const title = lastSearched.trim();
+    if (!title) return;
+    setBusy(true);
+    setError("");
+    const res = await fetch("/api/books", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title,
+        author: manualAuthor.trim() || null,
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? "저장 실패");
+      setBusy(false);
+      return;
+    }
+    const book = await res.json();
+    router.replace(`/books/${book.id}`);
+    router.refresh();
+  }
+
+  const noResults =
+    !searching && lastSearched && results.length === 0 && !searchError;
+
   return (
-    <form onSubmit={onSubmit} className="paper-card relative flex flex-col gap-5 px-6 py-8">
+    <form
+      onSubmit={onSubmit}
+      className="paper-card relative flex flex-col gap-5 px-6 py-8"
+    >
       {busy && (
         <div className="fade-up absolute inset-0 z-10 flex items-center justify-center rounded-[14px] bg-[color:var(--paper-2)]/92 backdrop-blur-sm">
           <BookshelfLoader label="책장에 꽂는 중…" />
         </div>
       )}
+
       <div className="flex flex-col gap-1.5">
         <label
           htmlFor="q"
@@ -110,68 +141,82 @@ export default function NewBookForm() {
         >
           책 검색 · 제목 또는 작가
         </label>
-        <div className="relative">
+        <div className="flex gap-2">
           <input
             id="q"
             autoFocus
             value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              if (picked) setPicked(null);
-            }}
-            placeholder="제목이나 작가 이름을 입력해 보세요"
-            className="w-full rounded-lg border hairline bg-[color:var(--paper)] px-4 py-3 text-base"
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="제목이나 작가 이름을 입력하고 Enter"
+            className="flex-1 rounded-lg border hairline bg-[color:var(--paper)] px-4 py-3 text-base"
           />
-          {picked && (
-            <button
-              type="button"
-              onClick={clearPick}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border hairline px-2 py-0.5 text-[10px] uppercase tracking-wider text-[color:var(--ink-muted)]"
-            >
-              해제
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={runSearch}
+            disabled={searching || query.trim().length < 2}
+            className="shrink-0 rounded-lg px-5 text-[11px] uppercase tracking-wider text-[color:var(--paper)] disabled:opacity-50"
+            style={{ background: "var(--accent)" }}
+          >
+            {searching ? "찾는 중" : "검색"}
+          </button>
         </div>
-
-        {!picked && results.length > 0 && (
-          <ul className="mt-2 flex max-h-80 flex-col gap-1 overflow-y-auto rounded-lg border hairline bg-[color:var(--paper)] p-1">
-            {results.map((r) => (
-              <li key={r.isbn || r.title}>
-                <button
-                  type="button"
-                  onClick={() => pick(r)}
-                  className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left hover:bg-[color:var(--paper-2)]"
-                >
-                  {r.cover ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={r.cover}
-                      alt=""
-                      className="h-14 w-10 shrink-0 rounded-sm object-cover"
-                    />
-                  ) : (
-                    <div className="h-14 w-10 shrink-0 rounded-sm border hairline bg-[color:var(--paper-2)]" />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="serif truncate text-[14px] text-[color:var(--ink)]">
-                      {r.title}
-                    </p>
-                    <p className="truncate text-[11px] text-[color:var(--ink-muted)]">
-                      {r.author || "저자 미상"}
-                      {r.publisher && ` · ${r.publisher}`}
-                    </p>
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {!picked && searching && (
-          <p className="text-[11px] italic text-[color:var(--ink-soft)]">
-            검색 중…
-          </p>
-        )}
+        <p className="text-[11px] text-[color:var(--ink-soft)]">
+          두 글자 이상 입력 후 Enter 또는 검색 버튼
+        </p>
       </div>
+
+      {searching && (
+        <div className="fade-up flex items-center justify-center rounded-lg border hairline bg-[color:var(--paper)] py-6">
+          <BookshelfLoader size="sm" label="서가를 뒤지는 중…" />
+        </div>
+      )}
+
+      {searchError && (
+        <p
+          className="rounded-md px-3 py-2 text-xs"
+          style={{
+            background: "color-mix(in oklab, var(--danger) 10%, transparent)",
+            color: "var(--danger)",
+          }}
+        >
+          {searchError}
+        </p>
+      )}
+
+      {!picked && !searching && results.length > 0 && (
+        <ul className="fade-up flex max-h-96 flex-col gap-1 overflow-y-auto rounded-lg border hairline bg-[color:var(--paper)] p-1">
+          {results.map((r) => (
+            <li key={r.isbn || r.title}>
+              <button
+                type="button"
+                onClick={() => pick(r)}
+                className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left hover:bg-[color:var(--paper-2)]"
+              >
+                {r.cover ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={r.cover}
+                    alt=""
+                    className="h-16 w-11 shrink-0 rounded-sm object-cover"
+                  />
+                ) : (
+                  <div className="h-16 w-11 shrink-0 rounded-sm border hairline bg-[color:var(--paper-2)]" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="serif truncate text-[14px] text-[color:var(--ink)]">
+                    {r.title}
+                  </p>
+                  <p className="truncate text-[11px] text-[color:var(--ink-muted)]">
+                    {r.author || "저자 미상"}
+                    {r.publisher && ` · ${r.publisher}`}
+                  </p>
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {picked && (
         <div className="fade-up flex items-start gap-4 rounded-lg border hairline bg-[color:var(--paper)] p-4">
@@ -185,7 +230,7 @@ export default function NewBookForm() {
           ) : (
             <div className="h-24 w-16 shrink-0 rounded-sm border hairline" />
           )}
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="serif text-[16px] text-[color:var(--ink)]">
               {picked.title}
             </p>
@@ -199,23 +244,41 @@ export default function NewBookForm() {
               </p>
             )}
           </div>
+          <button
+            type="button"
+            onClick={clearPick}
+            className="shrink-0 rounded-full border hairline px-2 py-0.5 text-[10px] uppercase tracking-wider text-[color:var(--ink-muted)]"
+          >
+            해제
+          </button>
         </div>
       )}
 
-      {!picked && query.trim().length >= 2 && results.length === 0 && !searching && (
-        <div className="flex flex-col gap-1.5">
-          <label
-            htmlFor="author"
-            className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]"
-          >
-            저자 (검색 결과 없음 — 직접 입력)
+      {noResults && (
+        <div className="fade-up flex flex-col gap-3 rounded-lg border hairline bg-[color:var(--paper)] p-4">
+          <p className="text-[12px] text-[color:var(--ink-muted)]">
+            검색 결과가 없어요. 직접 입력해서 담아도 돼요.
+          </p>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
+              저자 (선택)
+            </span>
+            <input
+              value={manualAuthor}
+              onChange={(e) => setManualAuthor(e.target.value)}
+              className="rounded-lg border hairline bg-[color:var(--paper-2)] px-4 py-3 text-base"
+            />
           </label>
-          <input
-            id="author"
-            value={manualAuthor}
-            onChange={(e) => setManualAuthor(e.target.value)}
-            className="rounded-lg border hairline bg-[color:var(--paper)] px-4 py-3 text-base"
-          />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={saveManual}
+              disabled={busy}
+              className="rounded-full border hairline px-4 py-1.5 text-[11px] uppercase tracking-wider text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
+            >
+              그대로 담기
+            </button>
+          </div>
         </div>
       )}
 
@@ -241,7 +304,7 @@ export default function NewBookForm() {
         </button>
         <button
           type="submit"
-          disabled={busy || (!picked && query.trim().length === 0)}
+          disabled={busy || !picked}
           className="rounded-full px-5 py-2 text-[11px] uppercase tracking-wider text-[color:var(--paper)] disabled:opacity-50"
           style={{ background: "var(--accent)" }}
         >
