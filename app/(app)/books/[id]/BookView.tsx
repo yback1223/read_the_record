@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import BookshelfLoader from "@/components/BookshelfLoader";
 
 type Recording = {
   id: string;
@@ -185,9 +186,16 @@ export default function BookView({ bookId }: { bookId: string }) {
   }
 
   if (!book) {
+    if (error) {
+      return (
+        <div className="p-8 text-sm italic text-[color:var(--ink-soft)]">
+          {error}
+        </div>
+      );
+    }
     return (
-      <div className="p-8 text-sm italic text-[color:var(--ink-soft)]">
-        {error || "불러오는 중…"}
+      <div className="flex min-h-[60vh] items-center justify-center p-10">
+        <BookshelfLoader label="책을 펼치는 중…" />
       </div>
     );
   }
@@ -229,7 +237,12 @@ export default function BookView({ bookId }: { bookId: string }) {
         <div className="h-px w-full bg-[color:var(--rule)]" />
       </header>
 
-      <section className="paper-card flex flex-col items-center gap-5 px-6 py-8">
+      <section className="paper-card relative flex flex-col items-center gap-5 px-6 py-8">
+        {busy && (
+          <div className="fade-up absolute inset-0 z-10 flex items-center justify-center rounded-[14px] bg-[color:var(--paper-2)]/92 backdrop-blur-sm">
+            <BookshelfLoader label="목소리를 글로 옮기는 중…" />
+          </div>
+        )}
         <div className="flex flex-col items-center gap-1">
           <div className="serif text-[32px] tabular-nums tracking-wide text-[color:var(--ink)]">
             {formatElapsed(elapsed)}
@@ -338,40 +351,159 @@ export default function BookView({ bookId }: { bookId: string }) {
 
         <ul className="flex flex-col gap-5">
           {book.recordings.map((r) => (
-            <li key={r.id} className="paper-card fade-up px-6 py-6">
-              <div className="flex items-center justify-between">
-                <time className="text-[11px] uppercase tracking-wider text-[color:var(--ink-soft)]">
-                  {formatDate(r.createdAt)}
-                </time>
-                <button
-                  type="button"
-                  onClick={() => deleteRecording(r.id)}
-                  className="rounded-full border hairline px-2.5 py-0.5 text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)] hover:text-[color:var(--danger)] hover:border-[color:var(--danger)]"
-                >
-                  지움
-                </button>
-              </div>
-
-              <blockquote className="prose-reading mt-4 border-l-2 pl-4"
-                style={{ borderColor: "var(--accent)" }}
-              >
-                {r.transcript || (
-                  <span className="italic text-[color:var(--ink-soft)]">
-                    (비어 있음)
-                  </span>
-                )}
-              </blockquote>
-
-              <audio
-                controls
-                preload="none"
-                src={`/api/recordings/${r.id}/audio`}
-                className="mt-4 w-full"
-              />
-            </li>
+            <RecordingCard
+              key={r.id}
+              recording={r}
+              formattedDate={formatDate(r.createdAt)}
+              onDelete={() => deleteRecording(r.id)}
+              onSaved={(updated) => {
+                setBook((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        recordings: prev.recordings.map((x) =>
+                          x.id === updated.id ? { ...x, ...updated } : x,
+                        ),
+                      }
+                    : prev,
+                );
+              }}
+            />
           ))}
         </ul>
       </section>
     </div>
+  );
+}
+
+function RecordingCard({
+  recording,
+  formattedDate,
+  onDelete,
+  onSaved,
+}: {
+  recording: Recording;
+  formattedDate: string;
+  onDelete: () => void;
+  onSaved: (r: Recording) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(recording.transcript);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  function startEdit() {
+    setDraft(recording.transcript);
+    setErr("");
+    setEditing(true);
+  }
+
+  async function save() {
+    setSaving(true);
+    setErr("");
+    const res = await fetch(`/api/recordings/${recording.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript: draft }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setErr(data.error ?? "저장 실패");
+      setSaving(false);
+      return;
+    }
+    const updated = (await res.json()) as Recording;
+    onSaved(updated);
+    setSaving(false);
+    setEditing(false);
+  }
+
+  return (
+    <li className="paper-card fade-up px-6 py-6">
+      <div className="flex items-center justify-between">
+        <time className="text-[11px] uppercase tracking-wider text-[color:var(--ink-soft)]">
+          {formattedDate}
+        </time>
+        <div className="flex items-center gap-2">
+          {!editing && (
+            <button
+              type="button"
+              onClick={startEdit}
+              className="rounded-full border hairline px-2.5 py-0.5 text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)] hover:text-[color:var(--ink)] hover:border-[color:var(--rule-strong)]"
+            >
+              다듬기
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onDelete}
+            className="rounded-full border hairline px-2.5 py-0.5 text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)] hover:text-[color:var(--danger)] hover:border-[color:var(--danger)]"
+          >
+            지움
+          </button>
+        </div>
+      </div>
+
+      {editing ? (
+        <div className="mt-4 flex flex-col gap-3">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={Math.max(3, draft.split("\n").length + 1)}
+            className="prose-reading w-full resize-y rounded-lg border hairline bg-[color:var(--paper)] p-4"
+            style={{ borderLeft: "2px solid var(--accent)" }}
+          />
+          {err && (
+            <p
+              className="rounded-md px-3 py-2 text-xs"
+              style={{
+                background:
+                  "color-mix(in oklab, var(--danger) 10%, transparent)",
+                color: "var(--danger)",
+              }}
+            >
+              {err}
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              disabled={saving}
+              className="rounded-full border hairline px-4 py-1.5 text-[11px] uppercase tracking-wider text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving || draft === recording.transcript}
+              className="rounded-full px-4 py-1.5 text-[11px] uppercase tracking-wider text-[color:var(--paper)] disabled:opacity-50"
+              style={{ background: "var(--accent)" }}
+            >
+              {saving ? "저장 중…" : "저장"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <blockquote
+          className="prose-reading mt-4 border-l-2 pl-4"
+          style={{ borderColor: "var(--accent)" }}
+        >
+          {recording.transcript || (
+            <span className="italic text-[color:var(--ink-soft)]">
+              (비어 있음)
+            </span>
+          )}
+        </blockquote>
+      )}
+
+      <audio
+        controls
+        preload="none"
+        src={`/api/recordings/${recording.id}/audio`}
+        className="mt-4 w-full"
+      />
+    </li>
   );
 }

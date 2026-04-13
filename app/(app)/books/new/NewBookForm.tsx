@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import BookshelfLoader from "@/components/BookshelfLoader";
 
 type SearchItem = {
   title: string;
@@ -96,7 +97,12 @@ export default function NewBookForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="paper-card flex flex-col gap-5 px-6 py-8">
+    <form onSubmit={onSubmit} className="paper-card relative flex flex-col gap-5 px-6 py-8">
+      {busy && (
+        <div className="fade-up absolute inset-0 z-10 flex items-center justify-center rounded-[14px] bg-[color:var(--paper-2)]/92 backdrop-blur-sm">
+          <BookshelfLoader label="책장에 꽂는 중…" />
+        </div>
+      )}
       <div className="flex flex-col gap-1.5">
         <label
           htmlFor="q"
