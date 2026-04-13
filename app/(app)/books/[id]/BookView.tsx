@@ -20,6 +20,8 @@ type Book = {
 
 type Status = "idle" | "uploading" | "error";
 
+const MAX_RECORDING_SECONDS = 60;
+
 export default function BookView({ bookId }: { bookId: string }) {
   const router = useRouter();
   const [book, setBook] = useState<Book | null>(null);
@@ -94,7 +96,11 @@ export default function BookView({ bookId }: { bookId: string }) {
       setElapsed(0);
       const startedAt = Date.now();
       timerRef.current = window.setInterval(() => {
-        setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+        const sec = Math.floor((Date.now() - startedAt) / 1000);
+        setElapsed(sec);
+        if (sec >= MAX_RECORDING_SECONDS) {
+          stopRecording();
+        }
       }, 250);
     } catch (err) {
       setError(
@@ -210,8 +216,23 @@ export default function BookView({ bookId }: { bookId: string }) {
       </header>
 
       <section className="paper-card flex flex-col items-center gap-5 px-6 py-8">
-        <div className="serif text-[32px] tabular-nums tracking-wide text-[color:var(--ink)]">
-          {formatElapsed(elapsed)}
+        <div className="flex flex-col items-center gap-1">
+          <div className="serif text-[32px] tabular-nums tracking-wide text-[color:var(--ink)]">
+            {formatElapsed(elapsed)}
+            <span className="ml-2 text-[14px] text-[color:var(--ink-soft)]">
+              / {formatElapsed(MAX_RECORDING_SECONDS)}
+            </span>
+          </div>
+          <div className="h-[3px] w-40 overflow-hidden rounded-full bg-[color:var(--rule)]">
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${Math.min(100, (elapsed / MAX_RECORDING_SECONDS) * 100)}%`,
+                background: "var(--accent)",
+                transitionDuration: "240ms",
+              }}
+            />
+          </div>
         </div>
 
         <button
@@ -241,8 +262,8 @@ export default function BookView({ bookId }: { bookId: string }) {
           {busy
             ? "문장을 옮기는 중…"
             : isRecording
-              ? "듣는 중 · 다시 눌러 마침"
-              : "눌러서 녹음 시작"}
+              ? `듣는 중 · 최대 ${MAX_RECORDING_SECONDS}초 · 다시 눌러 마침`
+              : `눌러서 녹음 시작 · 최대 ${MAX_RECORDING_SECONDS}초`}
         </p>
 
         <div className="mt-2 flex w-full items-center gap-3">
