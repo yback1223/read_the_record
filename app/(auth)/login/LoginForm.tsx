@@ -27,6 +27,15 @@ export default function LoginForm() {
       setBusy(false);
       return;
     }
+    try {
+      await fetch("/api/auth/log-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "login" }),
+      });
+    } catch {
+      // non-blocking
+    }
     router.replace(next);
     router.refresh();
   }

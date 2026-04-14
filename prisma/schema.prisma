@@ -28,8 +28,21 @@ model Profile {
   active     Boolean       @default(true)
   createdAt  DateTime      @default(now())
   approvedAt DateTime?
+  logins     LoginEvent[]
 
   @@index([status])
+}
+
+model LoginEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  profile   Profile  @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  kind      String   @default("login")
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }
 
 model Book {

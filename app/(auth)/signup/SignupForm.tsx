@@ -50,6 +50,15 @@ export default function SignupForm() {
       return;
     }
     if (data.session) {
+      try {
+        await fetch("/api/auth/log-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: "signup" }),
+        });
+      } catch {
+        // non-blocking
+      }
       router.replace("/");
       router.refresh();
     } else {
