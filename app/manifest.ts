@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "책에 남기는 목소리",
     start_url: "/",
     display: "standalone",
-    background_color: "#f6f1e7",
-    theme_color: "#f6f1e7",
+    background_color: "#f4ead0",
+    theme_color: "#f4ead0",
     orientation: "portrait",
     icons: [
       {
