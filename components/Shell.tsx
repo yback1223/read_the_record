@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import SignOutButton from "@/components/SignOutButton";
+import ThemeToggle from "@/components/ThemeToggle";
 
 type NavItem = {
   href: string;
@@ -175,17 +176,25 @@ export default function Shell({
           </>
         )}
 
-        <div className="mt-auto border-t hairline px-6 py-5">
-          {nickname && (
-            <p className="serif truncate text-[14px] text-[color:var(--ink)]">
-              {nickname}
+        <div className="mt-auto flex flex-col gap-3 border-t hairline px-6 py-5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
+              테마
+            </span>
+            <ThemeToggle />
+          </div>
+          <div>
+            {nickname && (
+              <p className="serif truncate text-[14px] text-[color:var(--ink)]">
+                {nickname}
+              </p>
+            )}
+            <p className="mt-0.5 truncate text-[11px] text-[color:var(--ink-soft)]">
+              {userEmail}
             </p>
-          )}
-          <p className="mt-0.5 truncate text-[11px] text-[color:var(--ink-soft)]">
-            {userEmail}
-          </p>
-          <div className="mt-2">
-            <SignOutButton />
+            <div className="mt-2">
+              <SignOutButton />
+            </div>
           </div>
         </div>
       </aside>

@@ -42,7 +42,17 @@ export default function RootLayout({
     <html
       lang="ko"
       className={`${sans.variable} ${serif.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script
+          // Set theme before paint to avoid flash
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var t=localStorage.getItem('reading:theme');if(t==='dark'||t==='light'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();",
+          }}
+        />
+      </head>
       <body className="min-h-full">{children}</body>
     </html>
   );
