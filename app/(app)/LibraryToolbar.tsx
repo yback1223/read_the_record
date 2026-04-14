@@ -2,17 +2,18 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-
-type View = "grid" | "list";
+import type { View } from "./LibraryClient";
 
 export default function LibraryToolbar({
   initialQ,
-  initialView,
   initialSize,
+  view,
+  onChangeView,
 }: {
   initialQ: string;
-  initialView: View;
   initialSize: number;
+  view: View;
+  onChangeView: (v: View) => void;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -35,12 +36,12 @@ export default function LibraryToolbar({
 
   function onSubmitSearch(e: React.FormEvent) {
     e.preventDefault();
-    pushParams({ q: q.trim() || undefined });
+    pushParams({ q: q.trim() || undefined, page: undefined });
   }
 
   function clearSearch() {
     setQ("");
-    pushParams({ q: undefined });
+    pushParams({ q: undefined, page: undefined });
   }
 
   return (
@@ -77,12 +78,9 @@ export default function LibraryToolbar({
       <div className="flex items-center justify-end gap-2 self-end md:self-auto">
         <SizeSelect
           value={initialSize}
-          onChange={(n) => pushParams({ size: String(n) })}
+          onChange={(n) => pushParams({ size: String(n), page: undefined })}
         />
-        <ViewToggle
-          value={initialView}
-          onChange={(v) => pushParams({ view: v })}
-        />
+        <ViewToggle value={view} onChange={onChangeView} />
       </div>
     </div>
   );
