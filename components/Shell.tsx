@@ -80,13 +80,16 @@ export default function Shell({
   return (
     <div className="flex min-h-dvh">
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r hairline bg-[color:var(--paper-2)] md:static md:translate-x-0 ${
-          open ? "translate-x-0" : "-translate-x-full"
-        } md:!translate-x-0`}
+        className={`fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r hairline bg-[color:var(--paper-2)] md:static md:translate-x-0 ${
+          open
+            ? "translate-x-0 shadow-[24px_0_60px_-30px_rgba(70,50,20,0.45)]"
+            : "-translate-x-full shadow-none"
+        } md:!translate-x-0 md:!shadow-none`}
         style={{
-          transitionProperty: "transform",
-          transitionDuration: "360ms",
-          transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
+          willChange: "transform",
+          transitionProperty: "transform, box-shadow",
+          transitionDuration: "520ms",
+          transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
         }}
       >
         <Link
@@ -104,8 +107,13 @@ export default function Shell({
         <div className="mx-6 h-px bg-[color:var(--rule)]" />
 
         <nav className="flex flex-col gap-1 px-4 pt-5">
-          {items.map((it) => (
-            <NavLink key={it.href} item={it} active={it.match(pathname)} />
+          {items.map((it, idx) => (
+            <NavLink
+              key={it.href}
+              item={it}
+              active={it.match(pathname)}
+              delay={open ? 120 + idx * 60 : 0}
+            />
           ))}
         </nav>
 
@@ -132,13 +140,20 @@ export default function Shell({
       </aside>
 
       <div
-        className={`fixed inset-0 z-30 bg-black/30 md:hidden ${
+        className={`fixed inset-0 z-30 md:hidden ${
           open
-            ? "opacity-100 pointer-events-auto"
-            : "opacity-0 pointer-events-none"
+            ? "opacity-100 pointer-events-auto backdrop-blur-[3px]"
+            : "opacity-0 pointer-events-none backdrop-blur-0"
         }`}
         onClick={() => setOpen(false)}
-        style={{ transitionProperty: "opacity", transitionDuration: "300ms" }}
+        style={{
+          background:
+            "radial-gradient(120% 80% at 30% 30%, rgba(20,12,4,0.42), rgba(20,12,4,0.18))",
+          willChange: "opacity, backdrop-filter",
+          transitionProperty: "opacity, backdrop-filter",
+          transitionDuration: "520ms",
+          transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+        }}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -170,10 +185,21 @@ export default function Shell({
   );
 }
 
-function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+function NavLink({
+  item,
+  active,
+  delay = 0,
+}: {
+  item: NavItem;
+  active: boolean;
+  delay?: number;
+}) {
   return (
     <Link
       href={item.href}
+      style={{
+        transitionDelay: `${delay}ms`,
+      }}
       className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] tracking-wide ${
         active
           ? "bg-[color:var(--paper)] text-[color:var(--accent)] shadow-[inset_2px_0_0_0_var(--accent)]"
