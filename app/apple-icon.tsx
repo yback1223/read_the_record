@@ -1,9 +1,15 @@
 import { ImageResponse } from "next/og";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 
-export default function AppleIcon() {
+export default async function AppleIcon() {
+  const svgPath = join(process.cwd(), "app", "icon.svg");
+  const svg = await readFile(svgPath, "utf8");
+  const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+
   return new ImageResponse(
     (
       <div
@@ -11,64 +17,13 @@ export default function AppleIcon() {
           width: "100%",
           height: "100%",
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(160deg, #f6f1e7 0%, #ead9b8 100%)",
-          position: "relative",
+          background: "#f6f1e7",
         }}
       >
-        {/* frame */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 12,
-            border: "1.5px solid #d4c9b2",
-            borderRadius: 28,
-            display: "flex",
-          }}
-        />
-
-        {/* book spines */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-end",
-            gap: 4,
-            marginBottom: 8,
-          }}
-        >
-          <div style={{ width: 11, height: 44, borderRadius: 2, background: "#8a4a23" }} />
-          <div style={{ width: 11, height: 52, borderRadius: 2, background: "#2b2520" }} />
-          <div style={{ width: 11, height: 40, borderRadius: 2, background: "#b9733f" }} />
-          <div style={{ width: 11, height: 48, borderRadius: 2, background: "#7a7168" }} />
-          <div style={{ width: 11, height: 44, borderRadius: 2, background: "#8a4a23" }} />
-        </div>
-
-        {/* shelf line */}
-        <div
-          style={{
-            width: 88,
-            height: 4,
-            borderRadius: 2,
-            background: "linear-gradient(180deg,#d4c9b2,#b29e75)",
-            marginBottom: 14,
-          }}
-        />
-
-        {/* monogram */}
-        <div
-          style={{
-            fontSize: 22,
-            color: "#2b2520",
-            fontFamily: "serif",
-            fontWeight: 700,
-            letterSpacing: 3,
-            display: "flex",
-          }}
-        >
-          RTR
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={dataUrl} width={180} height={180} alt="" />
       </div>
     ),
     { ...size },
