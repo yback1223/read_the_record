@@ -4,13 +4,11 @@ import Link from "next/link";
 export default function SignupPage() {
   return (
     <div className="flex flex-col gap-8">
-      <header className="flex flex-col items-center gap-3 text-center">
-        <div className="h-px w-10 bg-[color:var(--rule-strong)]" />
-        <h1 className="serif text-3xl tracking-wide text-[color:var(--ink)]">
-          서재를 엽니다
-        </h1>
+      <header className="flex flex-col items-center gap-4 text-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/icon.svg" alt="Read The Record" className="h-20 w-20" />
         <p className="text-sm text-[color:var(--ink-muted)]">
-          이메일과 비밀번호로 시작해요
+          서재를 엽니다 · 이메일로 시작해요
         </p>
       </header>
 

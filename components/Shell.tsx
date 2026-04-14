@@ -89,14 +89,17 @@ export default function Shell({
           transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
         }}
       >
-        <div className="flex h-16 items-center px-6">
-          <Link
-            href="/"
-            className="serif text-lg tracking-[0.04em] text-[color:var(--ink)]"
-          >
-            Read The Record
-          </Link>
-        </div>
+        <Link
+          href="/"
+          className="flex h-20 items-center gap-3 px-6"
+          aria-label="Read The Record"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon.svg" alt="" className="h-12 w-12" />
+          <span className="serif text-[15px] leading-tight tracking-[0.04em] text-[color:var(--ink)]">
+            Read<br />The Record
+          </span>
+        </Link>
 
         <div className="mx-6 h-px bg-[color:var(--rule)]" />
 
@@ -155,6 +158,8 @@ export default function Shell({
               />
             </svg>
           </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon.svg" alt="" className="h-7 w-7" />
           <span className="serif text-base tracking-[0.04em]">
             Read The Record
           </span>
