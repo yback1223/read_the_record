@@ -117,17 +117,35 @@ function ViewToggle({
   value: View;
   onChange: (v: View) => void;
 }) {
+  const next: View = value === "grid" ? "list" : "grid";
   return (
-    <div className="flex items-center rounded-full border hairline p-0.5">
-      <ToggleButton active={value === "grid"} onClick={() => onChange("grid")}>
+    <button
+      type="button"
+      onClick={() => onChange(next)}
+      aria-label={next === "grid" ? "격자 보기로 전환" : "리스트 보기로 전환"}
+      className="flex items-center gap-1 rounded-full border hairline p-0.5"
+    >
+      <span
+        className={`flex h-7 w-8 items-center justify-center rounded-full ${
+          value === "grid"
+            ? "bg-[color:var(--ink)] text-[color:var(--paper)]"
+            : "text-[color:var(--ink-muted)]"
+        }`}
+      >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
           <rect x="2" y="2" width="5" height="5" rx="0.6" stroke="currentColor" strokeWidth="1.2" />
           <rect x="9" y="2" width="5" height="5" rx="0.6" stroke="currentColor" strokeWidth="1.2" />
           <rect x="2" y="9" width="5" height="5" rx="0.6" stroke="currentColor" strokeWidth="1.2" />
           <rect x="9" y="9" width="5" height="5" rx="0.6" stroke="currentColor" strokeWidth="1.2" />
         </svg>
-      </ToggleButton>
-      <ToggleButton active={value === "list"} onClick={() => onChange("list")}>
+      </span>
+      <span
+        className={`flex h-7 w-8 items-center justify-center rounded-full ${
+          value === "list"
+            ? "bg-[color:var(--ink)] text-[color:var(--paper)]"
+            : "text-[color:var(--ink-muted)]"
+        }`}
+      >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
           <path
             d="M3 4h10M3 8h10M3 12h10"
@@ -136,31 +154,7 @@ function ViewToggle({
             strokeLinecap="round"
           />
         </svg>
-      </ToggleButton>
-    </div>
-  );
-}
-
-function ToggleButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex h-7 w-8 items-center justify-center rounded-full ${
-        active
-          ? "bg-[color:var(--ink)] text-[color:var(--paper)]"
-          : "text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
-      }`}
-    >
-      {children}
+      </span>
     </button>
   );
 }
