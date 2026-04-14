@@ -381,7 +381,11 @@ export default function BookView({
         </div>
       </section>
 
-      <ReflectionEditor bookId={book.id} initial={book.reflection ?? ""} />
+      <ReflectionEditor
+        bookId={book.id}
+        initial={book.reflection ?? ""}
+        recordings={book.recordings}
+      />
 
       {error && (
         <div className="fade-up rounded-lg border px-4 py-3 text-sm"

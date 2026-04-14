@@ -1,25 +1,48 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { EditorContent, useEditor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Placeholder from "@tiptap/extension-placeholder";
+import type { Editor } from "@tiptap/react";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
+
+type RecordingRef = {
+  id: string;
+  transcript: string;
+  page: number | null;
+  createdAt: string;
+};
 
 export default function ReflectionEditor({
   bookId,
   initial,
+  recordings,
 }: {
   bookId: string;
   initial: string;
+  recordings: RecordingRef[];
 }) {
-  const [text, setText] = useState(initial);
   const [state, setState] = useState<SaveState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const lastSavedRef = useRef(initial);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef(false);
+  const [dirty, setDirty] = useState(false);
+
+  // slash menu state
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [slashQuery, setSlashQuery] = useState("");
+  const [slashPos, setSlashPos] = useState<{ top: number; left: number }>({
+    top: 0,
+    left: 0,
+  });
+  const [slashIdx, setSlashIdx] = useState(0);
+  const slashAnchorRef = useRef<{ from: number; to: number } | null>(null);
 
   const doSave = useCallback(
-    async (value: string) => {
+    async (html: string) => {
       if (inFlightRef.current) return;
       inFlightRef.current = true;
       setState("saving");
@@ -28,13 +51,14 @@ export default function ReflectionEditor({
         const res = await fetch(`/api/books/${bookId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reflection: value }),
+          body: JSON.stringify({ reflection: html }),
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error ?? "저장 실패");
         }
-        lastSavedRef.current = value;
+        lastSavedRef.current = html;
+        setDirty(false);
         setState("saved");
         setTimeout(() => {
           setState((s) => (s === "saved" ? "idle" : s));
@@ -49,47 +73,172 @@ export default function ReflectionEditor({
     [bookId],
   );
 
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [2, 3] },
+      }),
+      Placeholder.configure({
+        placeholder:
+          "이 책을 읽으며 떠오른 생각을 적어보세요. /를 누르면 녹음을 불러올 수 있어요.",
+        emptyEditorClass: "is-editor-empty",
+      }),
+    ],
+    content: initial || "",
+    immediatelyRender: false,
+    editorProps: {
+      attributes: {
+        class: "prose-reading tiptap-reflection focus:outline-none",
+      },
+    },
+    onUpdate({ editor }) {
+      const html = editor.getHTML();
+      setDirty(html !== lastSavedRef.current);
+
+      // detect slash command
+      detectSlash(editor);
+
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        doSave(html);
+      }, 1200);
+    },
+  });
+
   useEffect(() => {
-    if (text === lastSavedRef.current) return;
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setState("idle");
-    timerRef.current = setTimeout(() => {
-      doSave(text);
-    }, 1200);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [text, doSave]);
+  }, []);
 
   useEffect(() => {
     function onBeforeUnload(e: BeforeUnloadEvent) {
-      if (text !== lastSavedRef.current) {
+      if (dirty) {
         e.preventDefault();
         e.returnValue = "";
       }
     }
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [text]);
+  }, [dirty]);
 
-  function manualSave() {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    doSave(text);
-  }
+  function detectSlash(ed: Editor) {
+    const { from } = ed.state.selection;
+    const text = ed.state.doc.textBetween(Math.max(0, from - 30), from, "\n");
+    const match = text.match(/(?:^|\s)(\/([^\/\n\s]*))$/);
+    if (match) {
+      const matched = match[1];
+      const query = match[2];
+      const start = from - matched.length;
+      slashAnchorRef.current = { from: start, to: from };
+      setSlashQuery(query);
+      setSlashIdx(0);
 
-  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-      e.preventDefault();
-      manualSave();
+      // Position menu near the slash
+      try {
+        const coords = ed.view.coordsAtPos(from);
+        const containerRect =
+          (ed.options.element as HTMLElement).getBoundingClientRect();
+        setSlashPos({
+          top: coords.bottom - containerRect.top + 4,
+          left: coords.left - containerRect.left,
+        });
+      } catch {
+        // ignore
+      }
+      setSlashOpen(true);
+    } else {
+      setSlashOpen(false);
+      slashAnchorRef.current = null;
     }
   }
 
-  const dirty = text !== lastSavedRef.current;
-  const charCount = text.length;
+  const filteredRecordings = recordings.filter((r) => {
+    if (!slashQuery) return true;
+    const q = slashQuery.toLowerCase();
+    return (
+      r.transcript.toLowerCase().includes(q) ||
+      (r.page != null && String(r.page).includes(q))
+    );
+  });
+
+  function insertRecording(r: RecordingRef) {
+    if (!editor || !slashAnchorRef.current) return;
+    const { from, to } = slashAnchorRef.current;
+    const date = new Date(r.createdAt).toLocaleDateString("ko-KR", {
+      year: "2-digit",
+      month: "numeric",
+      day: "numeric",
+    });
+    const pageSuffix = r.page != null ? ` · p. ${r.page}` : "";
+    editor
+      .chain()
+      .focus()
+      .deleteRange({ from, to })
+      .insertContent([
+        {
+          type: "blockquote",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: r.transcript || " " }],
+            },
+          ],
+        },
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: `— 녹음 · ${date}${pageSuffix}`,
+              marks: [{ type: "italic" }],
+            },
+          ],
+        },
+        { type: "paragraph" },
+      ])
+      .run();
+    setSlashOpen(false);
+    slashAnchorRef.current = null;
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    // Cmd/Ctrl+S manual save
+    if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+      e.preventDefault();
+      manualSave();
+      return;
+    }
+    if (!slashOpen || filteredRecordings.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSlashIdx((i) => (i + 1) % filteredRecordings.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSlashIdx(
+        (i) => (i - 1 + filteredRecordings.length) % filteredRecordings.length,
+      );
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      insertRecording(filteredRecordings[slashIdx]);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setSlashOpen(false);
+    }
+  }
+
+  function manualSave() {
+    if (!editor) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    doSave(editor.getHTML());
+  }
+
+  const text = editor?.getText() ?? "";
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+  const charCount = text.length;
 
   return (
-    <section className="paper-card flex flex-col gap-3 px-6 py-6">
+    <section className="paper-card relative flex flex-col gap-3 px-6 py-6">
       <div className="flex items-center gap-3">
         <h2 className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
           독후감
@@ -98,18 +247,55 @@ export default function ReflectionEditor({
         <SaveBadge state={state} error={errorMsg} dirty={dirty} />
       </div>
 
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={onKeyDown}
-        rows={Math.max(8, text.split("\n").length + 2)}
-        placeholder="이 책을 읽으며 떠오른 생각을 자유롭게 적어보세요."
-        className="prose-reading w-full resize-y rounded-md bg-transparent p-2 outline-none placeholder:italic placeholder:text-[color:var(--ink-soft)]"
-        style={{
-          minHeight: "12rem",
-          lineHeight: 1.85,
-        }}
-      />
+      {editor && <Toolbar editor={editor} />}
+
+      <div className="relative" onKeyDown={onKeyDown}>
+        <EditorContent editor={editor} />
+
+        {slashOpen && (
+          <div
+            className="absolute z-30 flex w-72 flex-col overflow-hidden rounded-lg border hairline bg-[color:var(--paper-2)] shadow-[0_18px_40px_-20px_rgba(70,50,20,0.35)]"
+            style={{ top: slashPos.top, left: slashPos.left }}
+          >
+            <div className="border-b hairline px-3 py-2 text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)]">
+              녹음 불러오기{slashQuery && ` · "${slashQuery}"`}
+            </div>
+            {filteredRecordings.length === 0 ? (
+              <div className="px-3 py-3 text-[12px] italic text-[color:var(--ink-soft)]">
+                결과가 없어요
+              </div>
+            ) : (
+              <ul className="max-h-64 overflow-y-auto">
+                {filteredRecordings.map((r, idx) => (
+                  <li key={r.id}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertRecording(r);
+                      }}
+                      onMouseEnter={() => setSlashIdx(idx)}
+                      className={`flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left ${
+                        idx === slashIdx
+                          ? "bg-[color:var(--paper)]"
+                          : "hover:bg-[color:var(--paper)]"
+                      }`}
+                    >
+                      <span className="text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)]">
+                        {new Date(r.createdAt).toLocaleDateString("ko-KR")}
+                        {r.page != null ? ` · p. ${r.page}` : ""}
+                      </span>
+                      <span className="line-clamp-2 text-[12px] text-[color:var(--ink)]">
+                        {r.transcript || "(비어 있음)"}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)]">
         <span>
@@ -117,7 +303,7 @@ export default function ReflectionEditor({
         </span>
         <div className="flex items-center gap-3">
           <span className="italic normal-case tracking-normal">
-            쓰는 동안 자동으로도 보관돼요 · ⌘S
+            / 녹음 불러오기 · ⌘S 저장
           </span>
           <button
             type="button"
@@ -126,15 +312,151 @@ export default function ReflectionEditor({
             className="rounded-full px-4 py-1.5 text-[11px] uppercase tracking-wider text-[color:var(--paper)] disabled:opacity-50"
             style={{ background: "var(--accent)" }}
           >
-            {state === "saving"
-              ? "저장 중…"
-              : dirty
-                ? "저장"
-                : "저장됨"}
+            {state === "saving" ? "저장 중…" : dirty ? "저장" : "저장됨"}
           </button>
         </div>
       </div>
+
+      <style>{`
+        .tiptap-reflection {
+          min-height: 12rem;
+          padding: 0.5rem;
+          line-height: 1.85;
+        }
+        .tiptap-reflection p {
+          margin: 0 0 0.75em 0;
+        }
+        .tiptap-reflection h2 {
+          font-family: var(--font-serif-book), serif;
+          font-size: 1.4em;
+          margin: 1em 0 0.4em;
+        }
+        .tiptap-reflection h3 {
+          font-family: var(--font-serif-book), serif;
+          font-size: 1.15em;
+          margin: 0.9em 0 0.3em;
+        }
+        .tiptap-reflection blockquote {
+          border-left: 2px solid var(--accent);
+          padding-left: 1em;
+          margin: 0.8em 0;
+          color: var(--ink);
+          font-style: italic;
+        }
+        .tiptap-reflection ul, .tiptap-reflection ol {
+          padding-left: 1.4em;
+          margin: 0.5em 0;
+        }
+        .tiptap-reflection li {
+          margin: 0.15em 0;
+        }
+        .tiptap-reflection code {
+          background: color-mix(in oklab, var(--accent) 10%, transparent);
+          padding: 0.1em 0.35em;
+          border-radius: 3px;
+          font-size: 0.95em;
+        }
+        .tiptap-reflection p.is-editor-empty:first-child::before {
+          content: attr(data-placeholder);
+          float: left;
+          color: var(--ink-soft);
+          font-style: italic;
+          pointer-events: none;
+          height: 0;
+        }
+      `}</style>
     </section>
+  );
+}
+
+function Toolbar({ editor }: { editor: Editor }) {
+  const Btn = ({
+    active,
+    onClick,
+    title,
+    children,
+  }: {
+    active?: boolean;
+    onClick: () => void;
+    title: string;
+    children: React.ReactNode;
+  }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={`flex h-7 w-7 items-center justify-center rounded-md text-[12px] ${
+        active
+          ? "bg-[color:var(--ink)] text-[color:var(--paper)]"
+          : "text-[color:var(--ink-muted)] hover:text-[color:var(--ink)] hover:bg-[color:var(--paper)]"
+      }`}
+    >
+      {children}
+    </button>
+  );
+
+  return (
+    <div className="flex flex-wrap items-center gap-0.5 rounded-lg border hairline bg-[color:var(--paper)] p-1">
+      <Btn
+        active={editor.isActive("heading", { level: 2 })}
+        onClick={() =>
+          editor.chain().focus().toggleHeading({ level: 2 }).run()
+        }
+        title="제목"
+      >
+        H
+      </Btn>
+      <Btn
+        active={editor.isActive("bold")}
+        onClick={() => editor.chain().focus().toggleBold().run()}
+        title="굵게"
+      >
+        <strong>B</strong>
+      </Btn>
+      <Btn
+        active={editor.isActive("italic")}
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+        title="기울임"
+      >
+        <em>I</em>
+      </Btn>
+      <Btn
+        active={editor.isActive("strike")}
+        onClick={() => editor.chain().focus().toggleStrike().run()}
+        title="취소선"
+      >
+        <span style={{ textDecoration: "line-through" }}>S</span>
+      </Btn>
+      <div className="mx-1 h-4 w-px bg-[color:var(--rule)]" />
+      <Btn
+        active={editor.isActive("bulletList")}
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+        title="목록"
+      >
+        •
+      </Btn>
+      <Btn
+        active={editor.isActive("orderedList")}
+        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        title="번호 목록"
+      >
+        1.
+      </Btn>
+      <Btn
+        active={editor.isActive("blockquote")}
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+        title="인용"
+      >
+        ❞
+      </Btn>
+      <Btn
+        active={editor.isActive("code")}
+        onClick={() => editor.chain().focus().toggleCode().run()}
+        title="코드"
+      >
+        {"<>"}
+      </Btn>
+    </div>
   );
 }
 
