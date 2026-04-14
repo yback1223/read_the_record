@@ -15,10 +15,12 @@ type NavItem = {
 export default function Shell({
   children,
   userEmail,
+  nickname,
   isSuperAdmin = false,
 }: {
   children: React.ReactNode;
   userEmail?: string;
+  nickname?: string | null;
   isSuperAdmin?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -174,7 +176,12 @@ export default function Shell({
         )}
 
         <div className="mt-auto border-t hairline px-6 py-5">
-          <p className="truncate text-[11px] text-[color:var(--ink-soft)]">
+          {nickname && (
+            <p className="serif truncate text-[14px] text-[color:var(--ink)]">
+              {nickname}
+            </p>
+          )}
+          <p className="mt-0.5 truncate text-[11px] text-[color:var(--ink-soft)]">
             {userEmail}
           </p>
           <div className="mt-2">

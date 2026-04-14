@@ -22,6 +22,7 @@ enum ProfileRole {
 model Profile {
   userId     String        @id
   email      String        @unique
+  nickname   String?
   status     ProfileStatus @default(pending)
   role       ProfileRole   @default(user)
   active     Boolean       @default(true)
