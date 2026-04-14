@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/supabase/server";
 import type { Profile } from "@prisma/client";
@@ -20,7 +21,7 @@ function isSuperAdminEmail(email: string): boolean {
   return list.includes(email.toLowerCase());
 }
 
-export async function ensureProfile(
+export const ensureProfile = cache(async function ensureProfileImpl(
   userId: string,
   email: string,
 ): Promise<Profile> {
@@ -51,7 +52,7 @@ export async function ensureProfile(
       approvedAt: isAdmin ? new Date() : null,
     },
   });
-}
+});
 
 export async function requireUser(): Promise<{
   userId: string;
