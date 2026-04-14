@@ -16,8 +16,14 @@ const serif = Noto_Serif_KR({
 });
 
 export const metadata: Metadata = {
-  title: "Reading",
+  title: "Read The Record",
   description: "책에 남기는 목소리",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Read",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {
