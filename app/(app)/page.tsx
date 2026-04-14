@@ -38,7 +38,15 @@ export default async function Home({
     prisma.book.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      include: { _count: { select: { recordings: true } } },
+      select: {
+        id: true,
+        title: true,
+        author: true,
+        coverUrl: true,
+        publisher: true,
+        createdAt: true,
+        _count: { select: { recordings: true } },
+      },
       take: size,
       skip: (page - 1) * size,
     }),

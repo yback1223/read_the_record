@@ -27,9 +27,15 @@ type Status = "idle" | "uploading" | "error";
 
 const MAX_RECORDING_SECONDS = 60;
 
-export default function BookView({ bookId }: { bookId: string }) {
+export default function BookView({
+  bookId,
+  initial,
+}: {
+  bookId: string;
+  initial: Book;
+}) {
   const router = useRouter();
-  const [book, setBook] = useState<Book | null>(null);
+  const [book, setBook] = useState<Book | null>(initial);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
   const [language, setLanguage] = useState("ko");
@@ -62,10 +68,6 @@ export default function BookView({ bookId }: { bookId: string }) {
     if (res.ok) setBook(await res.json());
     else setError("책을 찾을 수 없습니다.");
   }, [bookId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   useEffect(() => {
     return () => {

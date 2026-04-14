@@ -1,9 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/auth"];
+const PUBLIC_PATH_PREFIXES = [
+  "/login",
+  "/signup",
+  "/pending",
+  "/auth",
+  "/api/auth",
+  "/icon",
+  "/apple-icon",
+  "/manifest.webmanifest",
+  "/favicon",
+];
+
+function isPublic(pathname: string): boolean {
+  return PUBLIC_PATH_PREFIXES.some((p) => pathname.startsWith(p));
+}
 
 export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+
+  // Public paths: just refresh cookies, no auth check, no redirect logic
+  if (isPublic(pathname)) {
+    return NextResponse.next({ request: req });
+  }
+
   let response = NextResponse.next({ request: req });
 
   const supabase = createServerClient(
@@ -31,19 +52,10 @@ export async function middleware(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = req.nextUrl;
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
-
-  if (!user && !isPublic) {
+  if (!user) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
-  }
-
-  if (user && (pathname === "/login" || pathname === "/signup")) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/";
     return NextResponse.redirect(url);
   }
 
@@ -51,5 +63,7 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|_next/data|favicon.ico|robots.txt|sitemap.xml|icon.svg|apple-icon|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
+  ],
 };
