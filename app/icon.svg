@@ -2,74 +2,125 @@
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#fbf7ee"/>
-      <stop offset="100%" stop-color="#ead9b8"/>
+      <stop offset="100%" stop-color="#e9d3a8"/>
     </linearGradient>
-    <linearGradient id="upperLip" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#b9733f"/>
-      <stop offset="100%" stop-color="#7a3818"/>
+    <linearGradient id="skin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f1c79e"/>
+      <stop offset="100%" stop-color="#d69b6a"/>
     </linearGradient>
-    <linearGradient id="lowerLip" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#c4804a"/>
-      <stop offset="100%" stop-color="#8a4a23"/>
+    <linearGradient id="cover" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8a4a23"/>
+      <stop offset="100%" stop-color="#5a2e12"/>
     </linearGradient>
+    <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fbf7ee"/>
+      <stop offset="100%" stop-color="#e8dcc0"/>
+    </linearGradient>
+    <radialGradient id="blush" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#e17a55" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#e17a55" stop-opacity="0"/>
+    </radialGradient>
   </defs>
 
-  <!-- paper background -->
+  <!-- paper background with frame -->
   <rect width="180" height="180" rx="36" fill="url(#bg)"/>
-  <rect x="9" y="9" width="162" height="162" rx="29" fill="none" stroke="#d4c9b2" stroke-width="1.2"/>
+  <rect x="9" y="9" width="162" height="162" rx="29" fill="none" stroke="#c9b888" stroke-width="1.2"/>
 
-  <!-- BOOK: the hero, big and unmistakable. Horizontal, slight tilt. -->
-  <g transform="rotate(-4 90 90)">
-    <!-- soft shadow under the book -->
-    <rect x="12" y="75" width="156" height="36" rx="2" fill="#2b2520" opacity="0.18" transform="translate(0,3)"/>
+  <!-- ───────── HEAD ───────── -->
+  <!-- hair back (under the head) -->
+  <path
+    d="M 48 52
+       C 44 24, 72 14, 90 16
+       C 110 14, 138 22, 134 56
+       C 134 60, 128 60, 122 56
+       C 118 62, 106 64, 90 62
+       C 74 64, 62 62, 58 56
+       C 52 60, 48 58, 48 52 Z"
+    fill="#3a2214"/>
 
-    <!-- cover -->
-    <rect x="12" y="74" width="156" height="36" rx="2.5" fill="#2b2520"/>
+  <!-- face -->
+  <ellipse cx="90" cy="58" rx="34" ry="36" fill="url(#skin)"/>
 
-    <!-- pages -->
-    <rect x="14" y="80" width="152" height="24" fill="#fbf7ee"/>
+  <!-- hair fringe on forehead (two soft clumps) -->
+  <path
+    d="M 58 40
+       C 62 28, 76 24, 84 36
+       C 88 30, 96 30, 100 38
+       C 108 26, 122 30, 124 42
+       C 120 48, 112 46, 104 44
+       C 98 48, 84 48, 76 44
+       C 68 48, 60 48, 58 42 Z"
+    fill="#3a2214"/>
 
-    <!-- center crease -->
-    <line x1="90" y1="74" x2="90" y2="110" stroke="#c2b48f" stroke-width="1.2"/>
+  <!-- ───────── EYES (closed, smiling crescents) ───────── -->
+  <path
+    d="M 68 62 Q 74 56, 80 62"
+    stroke="#2b1a0a" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+  <path
+    d="M 100 62 Q 106 56, 112 62"
+    stroke="#2b1a0a" stroke-width="2.8" fill="none" stroke-linecap="round"/>
 
-    <!-- left page text lines -->
-    <line x1="22" y1="86" x2="82" y2="86" stroke="#a69d92" stroke-width="1.2" stroke-linecap="round"/>
-    <line x1="22" y1="92" x2="78" y2="92" stroke="#a69d92" stroke-width="1.2" stroke-linecap="round"/>
-    <line x1="22" y1="98" x2="80" y2="98" stroke="#a69d92" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- eyebrows, subtle -->
+  <path d="M 68 52 Q 74 50, 80 52" stroke="#3a2214" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <path d="M 100 52 Q 106 50, 112 52" stroke="#3a2214" stroke-width="1.8" fill="none" stroke-linecap="round"/>
 
-    <!-- right page text lines -->
-    <line x1="98" y1="86" x2="158" y2="86" stroke="#a69d92" stroke-width="1.2" stroke-linecap="round"/>
-    <line x1="98" y1="92" x2="154" y2="92" stroke="#a69d92" stroke-width="1.2" stroke-linecap="round"/>
-    <line x1="98" y1="98" x2="156" y2="98" stroke="#a69d92" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- blush cheeks -->
+  <circle cx="64" cy="74" r="7" fill="url(#blush)"/>
+  <circle cx="116" cy="74" r="7" fill="url(#blush)"/>
+
+  <!-- ───────── BOOK (open, held up, covering mouth) ───────── -->
+  <!-- Covers (back layer) — a V shape like an open book seen slightly from above -->
+  <path
+    d="M 10 96
+       L 90 80
+       L 170 96
+       L 170 148
+       L 90 158
+       L 10 148 Z"
+    fill="url(#cover)"/>
+  <!-- spine highlight down middle -->
+  <line x1="90" y1="80" x2="90" y2="158" stroke="#2b1505" stroke-width="2"/>
+
+  <!-- Pages (front layer) — slightly inset -->
+  <path
+    d="M 16 100
+       L 88 86
+       L 88 154
+       L 16 144 Z"
+    fill="url(#page)"/>
+  <path
+    d="M 164 100
+       L 92 86
+       L 92 154
+       L 164 144 Z"
+    fill="url(#page)"/>
+
+  <!-- page edges (warm shadow where pages meet spine) -->
+  <path d="M 88 86 L 88 154" stroke="#c9b888" stroke-width="0.8"/>
+  <path d="M 92 86 L 92 154" stroke="#c9b888" stroke-width="0.8"/>
+
+  <!-- left page text lines -->
+  <line x1="24" y1="108" x2="80" y2="100" stroke="#a69273" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="24" y1="116" x2="80" y2="108" stroke="#a69273" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="24" y1="124" x2="80" y2="116" stroke="#a69273" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="24" y1="132" x2="80" y2="124" stroke="#a69273" stroke-width="1.2" stroke-linecap="round"/>
+
+  <!-- right page text lines -->
+  <line x1="100" y1="100" x2="156" y2="108" stroke="#a69273" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="100" y1="108" x2="156" y2="116" stroke="#a69273" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="100" y1="116" x2="156" y2="124" stroke="#a69273" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="100" y1="124" x2="156" y2="132" stroke="#a69273" stroke-width="1.2" stroke-linecap="round"/>
+
+  <!-- ───────── HANDS GRIPPING BOOK EDGES ───────── -->
+  <!-- left hand: small rounded shape with a thumb over the cover -->
+  <g>
+    <ellipse cx="14" cy="122" rx="9" ry="11" fill="url(#skin)"/>
+    <path d="M 10 108 Q 14 102, 20 108 L 18 118 Q 14 120, 12 116 Z" fill="url(#skin)"/>
   </g>
 
-  <!-- MOUTH sits on top of and under the book, so the book looks like it's being bitten. -->
-
-  <!-- upper lip: mustache-like curve resting on the top cover of the book, with cupid's bow -->
-  <path
-    d="M 55 78
-       C 60 56, 78 54, 88 74
-       C 90 70, 94 70, 96 74
-       C 106 54, 124 56, 129 78
-       C 118 76, 106 80, 92 80
-       C 78 80, 66 76, 55 78 Z"
-    fill="url(#upperLip)"/>
-
-  <!-- tiny teeth row (2 white rects) just under the upper lip, on top of the pages -->
-  <rect x="82" y="80" width="6" height="5" rx="1" fill="#fbf7ee" stroke="#c2b48f" stroke-width="0.6"/>
-  <rect x="92" y="80" width="6" height="5" rx="1" fill="#fbf7ee" stroke="#c2b48f" stroke-width="0.6"/>
-
-  <!-- lower lip: wide C curve under the book -->
-  <path
-    d="M 55 106
-       C 64 112, 70 116, 78 118
-       C 86 122, 96 122, 104 118
-       C 112 116, 118 112, 127 106
-       C 118 130, 64 130, 55 106 Z"
-    fill="url(#lowerLip)"/>
-
-  <!-- lower lip highlight -->
-  <path
-    d="M 78 120 Q 91 126, 104 120"
-    stroke="#e3a577" stroke-width="1.4" fill="none" stroke-linecap="round" opacity="0.55"/>
+  <!-- right hand -->
+  <g>
+    <ellipse cx="166" cy="122" rx="9" ry="11" fill="url(#skin)"/>
+    <path d="M 170 108 Q 166 102, 160 108 L 162 118 Q 166 120, 168 116 Z" fill="url(#skin)"/>
+  </g>
 </svg>
