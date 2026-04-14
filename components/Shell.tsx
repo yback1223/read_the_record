@@ -22,11 +22,32 @@ export default function Shell({
   isSuperAdmin?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname() ?? "/";
 
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    const v = window.localStorage.getItem("reading:sidebar-collapsed");
+    if (v === "1") setCollapsed(true);
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((v) => {
+      const next = !v;
+      try {
+        window.localStorage.setItem(
+          "reading:sidebar-collapsed",
+          next ? "1" : "0",
+        );
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }
 
   const items: NavItem[] = [
     {
@@ -80,29 +101,52 @@ export default function Shell({
   return (
     <div className="flex min-h-dvh">
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r hairline bg-[color:var(--paper-2)] md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r hairline bg-[color:var(--paper-2)] ${
           open
             ? "translate-x-0 shadow-[24px_0_60px_-30px_rgba(70,50,20,0.45)]"
             : "-translate-x-full shadow-none"
-        } md:!translate-x-0 md:!shadow-none`}
+        } ${
+          collapsed
+            ? "md:!w-0 md:!-translate-x-full md:!border-r-0"
+            : "md:!w-[280px] md:!translate-x-0"
+        } md:static md:!shadow-none`}
         style={{
-          willChange: "transform",
-          transitionProperty: "transform, box-shadow",
+          willChange: "transform, width",
+          transitionProperty: "transform, box-shadow, width",
           transitionDuration: "520ms",
           transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+          overflow: "hidden",
         }}
       >
-        <Link
-          href="/"
-          className="flex h-20 items-center gap-3 px-6"
-          aria-label="Read The Record"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icon.svg" alt="" className="h-12 w-12" />
-          <span className="serif text-[15px] leading-tight tracking-[0.04em] text-[color:var(--ink)]">
-            Read<br />The Record
-          </span>
-        </Link>
+        <div className="flex h-20 items-center justify-between gap-2 pr-3">
+          <Link
+            href="/"
+            className="flex flex-1 items-center gap-3 px-6"
+            aria-label="Read The Record"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icon.svg" alt="" className="h-12 w-12" />
+            <span className="serif text-[15px] leading-tight tracking-[0.04em] text-[color:var(--ink)]">
+              Read<br />The Record
+            </span>
+          </Link>
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label="사이드바 접기"
+            className="hidden h-8 w-8 items-center justify-center rounded-full border hairline text-[color:var(--ink-muted)] hover:text-[color:var(--ink)] hover:border-[color:var(--rule-strong)] md:flex"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M10 3 L4 8 L10 13"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
 
         <div className="mx-6 h-px bg-[color:var(--rule)]" />
 
@@ -155,6 +199,31 @@ export default function Shell({
           transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
         }}
       />
+
+      <button
+        type="button"
+        onClick={toggleCollapsed}
+        aria-label="사이드바 펼치기"
+        className={`fixed left-4 top-4 z-30 hidden h-9 w-9 items-center justify-center rounded-full border hairline bg-[color:var(--paper-2)] text-[color:var(--ink-muted)] hover:text-[color:var(--ink)] hover:border-[color:var(--rule-strong)] md:flex ${
+          collapsed ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        style={{
+          transitionProperty: "opacity",
+          transitionDuration: "320ms",
+          transitionDelay: collapsed ? "300ms" : "0ms",
+          boxShadow: "0 6px 20px -10px rgba(70,50,20,0.35)",
+        }}
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path
+            d="M6 3 L12 8 L6 13"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b hairline bg-[color:var(--paper)]/85 px-5 backdrop-blur md:hidden">
