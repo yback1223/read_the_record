@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Read",
+    title: "Read The Record",
     statusBarStyle: "default",
   },
 };

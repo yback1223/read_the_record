@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Read The Record",
-    short_name: "Read",
+    short_name: "Read The Record",
     description: "책에 남기는 목소리",
     start_url: "/",
     display: "standalone",
