@@ -4,65 +4,72 @@
       <stop offset="0%" stop-color="#fbf7ee"/>
       <stop offset="100%" stop-color="#ead9b8"/>
     </linearGradient>
-    <linearGradient id="lip" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="upperLip" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#b9733f"/>
-      <stop offset="100%" stop-color="#8a4a23"/>
+      <stop offset="100%" stop-color="#7a3818"/>
     </linearGradient>
-    <linearGradient id="lipLower" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#a0582b"/>
-      <stop offset="100%" stop-color="#7a3e1d"/>
+    <linearGradient id="lowerLip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c4804a"/>
+      <stop offset="100%" stop-color="#8a4a23"/>
     </linearGradient>
   </defs>
 
-  <!-- paper background with soft frame -->
+  <!-- paper background -->
   <rect width="180" height="180" rx="36" fill="url(#bg)"/>
-  <rect x="10" y="10" width="160" height="160" rx="28" fill="none" stroke="#d4c9b2" stroke-width="1.2"/>
+  <rect x="9" y="9" width="162" height="162" rx="29" fill="none" stroke="#d4c9b2" stroke-width="1.2"/>
 
-  <!-- upper lip -->
-  <path
-    d="M 34 82
-       C 46 62, 66 60, 78 78
-       C 84 72, 96 72, 102 78
-       C 114 60, 134 62, 146 82
-       Q 140 88, 90 88
-       Q 40 88, 34 82 Z"
-    fill="url(#lip)"/>
-  <!-- upper lip highlight -->
-  <path
-    d="M 56 72 Q 64 66, 72 72"
-    stroke="#e3b58d" stroke-width="1.4" fill="none" stroke-linecap="round" opacity="0.6"/>
+  <!-- BOOK: the hero, big and unmistakable. Horizontal, slight tilt. -->
+  <g transform="rotate(-4 90 90)">
+    <!-- soft shadow under the book -->
+    <rect x="12" y="75" width="156" height="36" rx="2" fill="#2b2520" opacity="0.18" transform="translate(0,3)"/>
 
-  <!-- book being held in the mouth (horizontal, slight tilt) -->
-  <g transform="rotate(-5 90 94)">
-    <!-- book back shadow -->
-    <rect x="22" y="86" width="136" height="20" rx="1.5" fill="#2b2520" opacity="0.25"
-          transform="translate(0,2)"/>
     <!-- cover -->
-    <rect x="22" y="84" width="136" height="20" rx="1.5" fill="#2b2520"/>
-    <!-- pages (front edge) -->
-    <rect x="22" y="88" width="136" height="12" fill="#fbf7ee"/>
-    <!-- center spine crease -->
-    <line x1="90" y1="86" x2="90" y2="102" stroke="#c2b48f" stroke-width="1"/>
-    <!-- text lines left page -->
-    <line x1="30" y1="91" x2="84" y2="91" stroke="#c2b48f" stroke-width="1" stroke-linecap="round"/>
-    <line x1="30" y1="95" x2="80" y2="95" stroke="#c2b48f" stroke-width="1" stroke-linecap="round"/>
-    <line x1="30" y1="99" x2="82" y2="99" stroke="#c2b48f" stroke-width="1" stroke-linecap="round"/>
-    <!-- text lines right page -->
-    <line x1="96" y1="91" x2="150" y2="91" stroke="#c2b48f" stroke-width="1" stroke-linecap="round"/>
-    <line x1="96" y1="95" x2="146" y2="95" stroke="#c2b48f" stroke-width="1" stroke-linecap="round"/>
-    <line x1="96" y1="99" x2="148" y2="99" stroke="#c2b48f" stroke-width="1" stroke-linecap="round"/>
+    <rect x="12" y="74" width="156" height="36" rx="2.5" fill="#2b2520"/>
+
+    <!-- pages -->
+    <rect x="14" y="80" width="152" height="24" fill="#fbf7ee"/>
+
+    <!-- center crease -->
+    <line x1="90" y1="74" x2="90" y2="110" stroke="#c2b48f" stroke-width="1.2"/>
+
+    <!-- left page text lines -->
+    <line x1="22" y1="86" x2="82" y2="86" stroke="#a69d92" stroke-width="1.2" stroke-linecap="round"/>
+    <line x1="22" y1="92" x2="78" y2="92" stroke="#a69d92" stroke-width="1.2" stroke-linecap="round"/>
+    <line x1="22" y1="98" x2="80" y2="98" stroke="#a69d92" stroke-width="1.2" stroke-linecap="round"/>
+
+    <!-- right page text lines -->
+    <line x1="98" y1="86" x2="158" y2="86" stroke="#a69d92" stroke-width="1.2" stroke-linecap="round"/>
+    <line x1="98" y1="92" x2="154" y2="92" stroke="#a69d92" stroke-width="1.2" stroke-linecap="round"/>
+    <line x1="98" y1="98" x2="156" y2="98" stroke="#a69d92" stroke-width="1.2" stroke-linecap="round"/>
   </g>
 
-  <!-- lower lip -->
+  <!-- MOUTH sits on top of and under the book, so the book looks like it's being bitten. -->
+
+  <!-- upper lip: mustache-like curve resting on the top cover of the book, with cupid's bow -->
   <path
-    d="M 34 106
-       Q 40 100, 90 100
-       Q 140 100, 146 106
-       C 134 128, 100 134, 90 132
-       C 80 134, 46 128, 34 106 Z"
-    fill="url(#lipLower)"/>
+    d="M 55 78
+       C 60 56, 78 54, 88 74
+       C 90 70, 94 70, 96 74
+       C 106 54, 124 56, 129 78
+       C 118 76, 106 80, 92 80
+       C 78 80, 66 76, 55 78 Z"
+    fill="url(#upperLip)"/>
+
+  <!-- tiny teeth row (2 white rects) just under the upper lip, on top of the pages -->
+  <rect x="82" y="80" width="6" height="5" rx="1" fill="#fbf7ee" stroke="#c2b48f" stroke-width="0.6"/>
+  <rect x="92" y="80" width="6" height="5" rx="1" fill="#fbf7ee" stroke="#c2b48f" stroke-width="0.6"/>
+
+  <!-- lower lip: wide C curve under the book -->
+  <path
+    d="M 55 106
+       C 64 112, 70 116, 78 118
+       C 86 122, 96 122, 104 118
+       C 112 116, 118 112, 127 106
+       C 118 130, 64 130, 55 106 Z"
+    fill="url(#lowerLip)"/>
+
   <!-- lower lip highlight -->
   <path
-    d="M 78 116 Q 90 120, 102 116"
-    stroke="#d69166" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.5"/>
+    d="M 78 120 Q 91 126, 104 120"
+    stroke="#e3a577" stroke-width="1.4" fill="none" stroke-linecap="round" opacity="0.55"/>
 </svg>
