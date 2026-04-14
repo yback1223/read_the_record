@@ -53,6 +53,7 @@ model Recording {
   audioPath  String
   mimeType   String
   transcript String
+  page       Int?
   createdAt  DateTime @default(now())
 
   @@index([bookId])

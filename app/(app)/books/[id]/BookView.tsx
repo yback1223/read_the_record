@@ -10,6 +10,7 @@ type Recording = {
   audioPath: string;
   mimeType: string;
   transcript: string;
+  page: number | null;
   createdAt: string;
 };
 
@@ -40,6 +41,7 @@ export default function BookView({
   const [error, setError] = useState("");
   const [language, setLanguage] = useState("ko");
 
+  const [pageEditId, setPageEditId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -158,6 +160,7 @@ export default function BookView({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "업로드 실패");
       setStatus("idle");
+      if (data?.id) setPageEditId(data.id);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -415,6 +418,8 @@ export default function BookView({
               key={r.id}
               recording={r}
               formattedDate={formatDate(r.createdAt)}
+              autoEditPage={pageEditId === r.id}
+              onPageEditConsumed={() => setPageEditId(null)}
               onDelete={() => deleteRecording(r.id)}
               onSaved={(updated) => {
                 setBook((prev) =>
@@ -439,11 +444,15 @@ export default function BookView({
 function RecordingCard({
   recording,
   formattedDate,
+  autoEditPage,
+  onPageEditConsumed,
   onDelete,
   onSaved,
 }: {
   recording: Recording;
   formattedDate: string;
+  autoEditPage?: boolean;
+  onPageEditConsumed?: () => void;
   onDelete: () => void;
   onSaved: (r: Recording) => void;
 }) {
@@ -451,6 +460,29 @@ function RecordingCard({
   const [draft, setDraft] = useState(recording.transcript);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+
+  const [pageEditing, setPageEditing] = useState(false);
+  const [pageDraft, setPageDraft] = useState<string>(
+    recording.page != null ? String(recording.page) : "",
+  );
+  const [savingPage, setSavingPage] = useState(false);
+  const pageInputRef = useRef<HTMLInputElement | null>(null);
+  const cardRef = useRef<HTMLLIElement | null>(null);
+
+  useEffect(() => {
+    if (autoEditPage) {
+      setPageEditing(true);
+      requestAnimationFrame(() => {
+        cardRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+        pageInputRef.current?.focus();
+      });
+      onPageEditConsumed?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoEditPage]);
 
   function startEdit() {
     setDraft(recording.transcript);
@@ -478,12 +510,90 @@ function RecordingCard({
     setEditing(false);
   }
 
+  async function savePage() {
+    const trimmed = pageDraft.trim();
+    const value = trimmed === "" ? null : Number(trimmed);
+    if (value !== null && (!Number.isInteger(value) || value < 0)) {
+      setErr("페이지는 0 이상의 정수여야 해요");
+      return;
+    }
+    setSavingPage(true);
+    setErr("");
+    const res = await fetch(`/api/recordings/${recording.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ page: value }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setErr(data.error ?? "저장 실패");
+      setSavingPage(false);
+      return;
+    }
+    const updated = (await res.json()) as Recording;
+    onSaved(updated);
+    setSavingPage(false);
+    setPageEditing(false);
+  }
+
+  function onPageKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      savePage();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setPageDraft(recording.page != null ? String(recording.page) : "");
+      setPageEditing(false);
+    }
+  }
+
   return (
-    <li className="paper-card fade-up px-6 py-6">
-      <div className="flex items-center justify-between">
-        <time className="text-[11px] uppercase tracking-wider text-[color:var(--ink-soft)]">
-          {formattedDate}
-        </time>
+    <li ref={cardRef} className="paper-card fade-up px-6 py-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <time className="text-[11px] uppercase tracking-wider text-[color:var(--ink-soft)]">
+            {formattedDate}
+          </time>
+          {pageEditing ? (
+            <span className="flex items-center gap-1 rounded-full border hairline px-2 py-0.5 text-[11px] text-[color:var(--ink-muted)]">
+              <span className="text-[10px] uppercase tracking-wider">p.</span>
+              <input
+                ref={pageInputRef}
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={pageDraft}
+                onChange={(e) => setPageDraft(e.target.value)}
+                onKeyDown={onPageKey}
+                onBlur={savePage}
+                disabled={savingPage}
+                placeholder="-"
+                className="w-12 bg-transparent text-center text-[12px] text-[color:var(--ink)] outline-none"
+              />
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setPageDraft(
+                  recording.page != null ? String(recording.page) : "",
+                );
+                setPageEditing(true);
+                requestAnimationFrame(() => pageInputRef.current?.focus());
+              }}
+              className={`rounded-full border hairline px-2.5 py-0.5 text-[11px] uppercase tracking-wider ${
+                recording.page != null
+                  ? "text-[color:var(--accent)] border-[color:var(--accent)]"
+                  : "text-[color:var(--ink-soft)] hover:text-[color:var(--ink)] hover:border-[color:var(--rule-strong)]"
+              }`}
+              title="페이지 적기"
+            >
+              {recording.page != null
+                ? `p. ${recording.page}`
+                : "+ 페이지"}
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {!editing && (
             <button

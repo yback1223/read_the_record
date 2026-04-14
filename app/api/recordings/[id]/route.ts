@@ -13,12 +13,30 @@ export async function PATCH(
     const { userId } = await requireApproved();
     const { id } = await params;
     const body = await req.json();
-    if (typeof body?.transcript !== "string") {
+
+    const data: { transcript?: string; page?: number | null } = {};
+    if (typeof body?.transcript === "string") data.transcript = body.transcript;
+    if ("page" in body) {
+      if (body.page == null || body.page === "") {
+        data.page = null;
+      } else {
+        const n = Number(body.page);
+        if (!Number.isInteger(n) || n < 0 || n > 99999) {
+          return NextResponse.json(
+            { error: "invalid page" },
+            { status: 400 },
+          );
+        }
+        data.page = n;
+      }
+    }
+    if (Object.keys(data).length === 0) {
       return NextResponse.json(
-        { error: "transcript required" },
+        { error: "nothing to update" },
         { status: 400 },
       );
     }
+
     const rec = await prisma.recording.findUnique({
       where: { id },
       include: { book: true },
@@ -28,7 +46,7 @@ export async function PATCH(
     }
     const updated = await prisma.recording.update({
       where: { id },
-      data: { transcript: body.transcript },
+      data,
     });
     return NextResponse.json(updated);
   } catch (err) {
