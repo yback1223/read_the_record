@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import FullscreenLoader from "@/components/FullscreenLoader";
 
 export default function SignupForm() {
   const router = useRouter();
@@ -68,6 +69,8 @@ export default function SignupForm() {
   }
 
   return (
+    <>
+    <FullscreenLoader show={busy} label="서재를 여는 중…" />
     <form onSubmit={onSubmit} className="flex flex-col gap-3">
       <Field
         id="nickname"
@@ -140,6 +143,7 @@ export default function SignupForm() {
         {busy ? "만드는 중…" : "회원가입"}
       </button>
     </form>
+    </>
   );
 }
 
