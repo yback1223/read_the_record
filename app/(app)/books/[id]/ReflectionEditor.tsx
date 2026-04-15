@@ -165,38 +165,11 @@ export default function ReflectionEditor({
   function insertRecording(r: RecordingRef) {
     if (!editor || !slashAnchorRef.current) return;
     const { from, to } = slashAnchorRef.current;
-    const date = new Date(r.createdAt).toLocaleDateString("ko-KR", {
-      year: "2-digit",
-      month: "numeric",
-      day: "numeric",
-    });
-    const pageSuffix = r.page != null ? ` · p. ${r.page}` : "";
     editor
       .chain()
       .focus()
       .deleteRange({ from, to })
-      .insertContent([
-        {
-          type: "blockquote",
-          content: [
-            {
-              type: "paragraph",
-              content: [{ type: "text", text: r.transcript || " " }],
-            },
-          ],
-        },
-        {
-          type: "paragraph",
-          content: [
-            {
-              type: "text",
-              text: `— 녹음 · ${date}${pageSuffix}`,
-              marks: [{ type: "italic" }],
-            },
-          ],
-        },
-        { type: "paragraph" },
-      ])
+      .insertContent(r.transcript || "")
       .run();
     setSlashOpen(false);
     slashAnchorRef.current = null;
