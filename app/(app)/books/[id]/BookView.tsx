@@ -43,6 +43,7 @@ export default function BookView({
 
   const [pageEditId, setPageEditId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [tab, setTab] = useState<"recordings" | "reflection">("recordings");
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -298,6 +299,32 @@ export default function BookView({
         <div className="h-px w-full bg-[color:var(--rule)]" />
       </header>
 
+      <div className="flex items-center rounded-full border hairline bg-[color:var(--paper-2)] p-1">
+        <button
+          type="button"
+          onClick={() => setTab("recordings")}
+          className={`flex-1 rounded-full py-2 text-[12px] tracking-wide ${
+            tab === "recordings"
+              ? "bg-[color:var(--ink)] text-[color:var(--paper)]"
+              : "text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
+          }`}
+        >
+          녹음 · {book.recordings.length}
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("reflection")}
+          className={`flex-1 rounded-full py-2 text-[12px] tracking-wide ${
+            tab === "reflection"
+              ? "bg-[color:var(--ink)] text-[color:var(--paper)]"
+              : "text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
+          }`}
+        >
+          독후감
+        </button>
+      </div>
+
+      {tab === "recordings" && (
       <section className="paper-card relative flex flex-col items-center gap-5 px-6 py-8">
         {busy && (
           <div className="fade-up absolute inset-0 z-10 flex items-center justify-center rounded-[14px] bg-[color:var(--paper-2)]/92 backdrop-blur-sm">
@@ -380,12 +407,15 @@ export default function BookView({
           </label>
         </div>
       </section>
+      )}
 
-      <ReflectionEditor
-        bookId={book.id}
-        initial={book.reflection ?? ""}
-        recordings={book.recordings}
-      />
+      {tab === "reflection" && (
+        <ReflectionEditor
+          bookId={book.id}
+          initial={book.reflection ?? ""}
+          recordings={book.recordings}
+        />
+      )}
 
       {error && (
         <div className="fade-up rounded-lg border px-4 py-3 text-sm"
@@ -399,6 +429,7 @@ export default function BookView({
         </div>
       )}
 
+      {tab === "recordings" && (
       <section className="flex flex-col gap-5">
         <div className="flex items-center gap-3">
           <h2 className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
@@ -441,6 +472,7 @@ export default function BookView({
           ))}
         </ul>
       </section>
+      )}
     </div>
   );
 }
