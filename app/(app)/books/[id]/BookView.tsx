@@ -299,29 +299,36 @@ export default function BookView({
         <div className="h-px w-full bg-[color:var(--rule)]" />
       </header>
 
-      <div className="flex items-center rounded-full border hairline bg-[color:var(--paper-2)] p-1">
-        <button
-          type="button"
-          onClick={() => setTab("recordings")}
-          className={`flex-1 rounded-full py-2 text-[12px] tracking-wide ${
-            tab === "recordings"
-              ? "bg-[color:var(--ink)] text-[color:var(--paper)]"
-              : "text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
-          }`}
-        >
-          녹음 · {book.recordings.length}
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab("reflection")}
-          className={`flex-1 rounded-full py-2 text-[12px] tracking-wide ${
-            tab === "reflection"
-              ? "bg-[color:var(--ink)] text-[color:var(--paper)]"
-              : "text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
-          }`}
-        >
-          독후감
-        </button>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center rounded-full border hairline bg-[color:var(--paper-2)] p-1">
+          <button
+            type="button"
+            onClick={() => setTab("recordings")}
+            className={`flex-1 rounded-full py-2 text-[12px] tracking-wide ${
+              tab === "recordings"
+                ? "bg-[color:var(--ink)] text-[color:var(--paper)]"
+                : "text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
+            }`}
+          >
+            속삭임 · {book.recordings.length}
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("reflection")}
+            className={`flex-1 rounded-full py-2 text-[12px] tracking-wide ${
+              tab === "reflection"
+                ? "bg-[color:var(--ink)] text-[color:var(--paper)]"
+                : "text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
+            }`}
+          >
+            여운
+          </button>
+        </div>
+        <p className="px-1 text-center text-[12px] italic leading-relaxed text-[color:var(--ink-muted)]">
+          {tab === "recordings"
+            ? "마음에 닿은 문장을 목소리로 스쳐 적어두는 곳"
+            : "책을 덮고 난 뒤에도 마음에 남는 생각을 길게 풀어두는 곳"}
+        </p>
       </div>
 
       {tab === "recordings" && (
@@ -433,7 +440,7 @@ export default function BookView({
       <section className="flex flex-col gap-5">
         <div className="flex items-center gap-3">
           <h2 className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
-            남긴 문장
+            속삭임
           </h2>
           <div className="h-px flex-1 bg-[color:var(--rule)]" />
           <span className="text-[11px] text-[color:var(--ink-soft)]">

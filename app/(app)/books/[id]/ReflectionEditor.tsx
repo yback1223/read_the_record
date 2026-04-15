@@ -222,7 +222,7 @@ export default function ReflectionEditor({
     <section className="paper-card relative flex flex-col gap-3 px-6 py-6">
       <div className="flex items-center gap-3">
         <h2 className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
-          독후감
+          여운
         </h2>
         <div className="h-px flex-1 bg-[color:var(--rule)]" />
         <SaveBadge state={state} error={errorMsg} dirty={dirty} />
