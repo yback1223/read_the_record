@@ -1,10 +1,22 @@
 import { Suspense } from "react";
-import LoginForm from "./LoginForm";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import LoginForm from "./LoginForm";
+import { getCurrentUser } from "@/lib/supabase/server";
+import { ensureProfile } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const user = await getCurrentUser();
+  if (user && user.email) {
+    const profile = await ensureProfile(user.id, user.email);
+    if (profile.status === "approved" && profile.active) redirect("/");
+    if (profile.status === "pending" || !profile.active || profile.status === "rejected") {
+      redirect("/pending");
+    }
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col items-center gap-4 text-center">

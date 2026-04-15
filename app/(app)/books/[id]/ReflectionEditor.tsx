@@ -169,7 +169,15 @@ export default function ReflectionEditor({
       .chain()
       .focus()
       .deleteRange({ from, to })
-      .insertContent(r.transcript || "")
+      .insertContent({
+        type: "blockquote",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: r.transcript || " " }],
+          },
+        ],
+      })
       .run();
     setSlashOpen(false);
     slashAnchorRef.current = null;
