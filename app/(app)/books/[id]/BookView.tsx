@@ -417,7 +417,7 @@ export default function BookView({
 
       <div key={tab} className="tab-fade flex flex-col gap-10">
       {(tab === "underlines" || tab === "whispers") && (
-      <section className="recorder-card relative flex flex-col items-center gap-6 overflow-hidden rounded-[18px] px-6 py-10">
+      <section className="recorder-card relative overflow-hidden rounded-[18px] px-5 py-5">
         {/* warm gradient background */}
         <div className="pointer-events-none absolute inset-0 -z-10" style={{
           background: isRecording
@@ -431,101 +431,96 @@ export default function BookView({
           </div>
         )}
 
-        {/* waveform visualization */}
-        <div className="flex h-20 items-end justify-center gap-[3px]">
-          {waveform.map((v, i) => {
-            const idle = !isRecording;
-            const h = idle
-              ? 3 + Math.sin(i * 0.6) * 2
-              : Math.max(3, v * 72);
-            return (
+        {/* record row: button + waveform + timer */}
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={isRecording ? stopRecording : startRecording}
+            disabled={busy}
+            aria-label={isRecording ? "녹음 정지" : "녹음 시작"}
+            className={`recorder-btn recorder-btn--compact relative flex shrink-0 items-center justify-center rounded-full disabled:opacity-50 ${
+              isRecording ? "recorder-btn--active" : ""
+            }`}
+          >
+            <span className={`absolute inset-0 rounded-full ${isRecording ? "recorder-glow" : ""}`} />
+            <span
+              className={`relative z-10 block ${isRecording ? "rounded-[3px]" : "rounded-full"}`}
+              style={{
+                width: isRecording ? 12 : 14,
+                height: isRecording ? 12 : 14,
+                background: "var(--paper)",
+              }}
+            />
+          </button>
+
+          {/* waveform + progress */}
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <div className="flex h-10 items-end gap-[2px]">
+              {waveform.map((v, i) => {
+                const idle = !isRecording;
+                const h = idle
+                  ? 2 + Math.sin(i * 0.6) * 1.5
+                  : Math.max(2, v * 36);
+                return (
+                  <div
+                    key={i}
+                    className="waveform-bar flex-1 rounded-full"
+                    style={{
+                      height: h,
+                      opacity: idle ? 0.2 : 0.3 + v * 0.7,
+                      background: idle
+                        ? "var(--ink-soft)"
+                        : `color-mix(in oklab, var(--accent) ${Math.round(50 + v * 50)}%, var(--accent-soft))`,
+                    }}
+                  />
+                );
+              })}
+            </div>
+            <div className="h-[2px] w-full overflow-hidden rounded-full bg-[color:var(--rule)]">
               <div
-                key={i}
-                className="waveform-bar rounded-full"
+                className="waveform-bar h-full rounded-full"
                 style={{
-                  width: 3,
-                  height: h,
-                  opacity: idle ? 0.25 : 0.3 + v * 0.7,
-                  background: idle
-                    ? "var(--ink-soft)"
-                    : `color-mix(in oklab, var(--accent) ${Math.round(50 + v * 50)}%, var(--accent-soft))`,
+                  width: `${Math.min(100, (elapsed / MAX_RECORDING_SECONDS) * 100)}%`,
+                  background: "var(--accent)",
                 }}
               />
-            );
-          })}
-        </div>
-
-        {/* timer */}
-        <div className="flex flex-col items-center gap-2">
-          <div className={`serif tabular-nums tracking-wide ${isRecording ? "text-[color:var(--accent)]" : "text-[color:var(--ink-muted)]"}`} style={{ fontSize: isRecording ? 28 : 20 }}>
-            {formatElapsed(elapsed)}
-            <span className="ml-1.5 text-[12px] text-[color:var(--ink-soft)]">
-              / {formatElapsed(MAX_RECORDING_SECONDS)}
-            </span>
+            </div>
           </div>
-          {/* subtle arc progress */}
-          <svg width="120" height="6" viewBox="0 0 120 6" className="overflow-visible">
-            <rect x="0" y="2" width="120" height="2" rx="1" fill="var(--rule)" />
-            <rect
-              x="0" y="2"
-              width={Math.min(120, (elapsed / MAX_RECORDING_SECONDS) * 120)}
-              height="2" rx="1"
-              fill="var(--accent)"
-              className="waveform-bar"
-            />
-          </svg>
+
+          {/* timer */}
+          <div className={`shrink-0 serif tabular-nums text-[14px] ${isRecording ? "text-[color:var(--accent)]" : "text-[color:var(--ink-muted)]"}`}>
+            {formatElapsed(elapsed)}
+            <span className="text-[10px] text-[color:var(--ink-soft)]"> / {formatElapsed(MAX_RECORDING_SECONDS)}</span>
+          </div>
         </div>
 
-        {/* record button */}
-        <button
-          type="button"
-          onClick={isRecording ? stopRecording : startRecording}
-          disabled={busy}
-          aria-label={isRecording ? "녹음 정지" : "녹음 시작"}
-          className={`recorder-btn relative flex items-center justify-center rounded-full disabled:opacity-50 ${
-            isRecording ? "recorder-btn--active" : ""
-          }`}
-        >
-          {/* outer glow ring */}
-          <span className={`absolute inset-0 rounded-full ${isRecording ? "recorder-glow" : ""}`} />
-          {/* inner shape */}
-          <span
-            className={`relative z-10 block rounded-${isRecording ? "[4px]" : "full"}`}
-            style={{
-              width: isRecording ? 18 : 22,
-              height: isRecording ? 18 : 22,
-              background: "var(--paper)",
-            }}
-          />
-        </button>
-
-        {/* hint text */}
-        <p className="text-[12px] italic text-[color:var(--ink-muted)]">
+        {/* hint */}
+        <p className="mt-2 text-center text-[11px] italic text-[color:var(--ink-muted)]">
           {busy
             ? "목소리를 글로 옮기는 중…"
             : isRecording
               ? "듣고 있어요… 다시 누르면 멈춰요"
               : tab === "underlines"
-                ? "마음에 닿은 문장을 소리 내어 읽어보세요"
-                : "지금 떠오르는 생각을 자유롭게 말해보세요"}
+                ? "눌러서 문장을 읽어보세요"
+                : "눌러서 생각을 말해보세요"}
         </p>
 
-        {/* bottom controls */}
-        <div className="flex w-full items-center gap-3">
+        {/* controls row */}
+        <div className="mt-3 flex items-center gap-2">
           <select
             id="lang"
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
             aria-label="언어"
-            className="flex-1 rounded-full border hairline bg-[color:var(--paper)]/60 px-4 py-2 text-[12px] text-[color:var(--ink-muted)] backdrop-blur-sm"
+            className="rounded-full border hairline bg-[color:var(--paper)]/60 px-3 py-1.5 text-[11px] text-[color:var(--ink-muted)] backdrop-blur-sm"
           >
             <option value="ko">한국어</option>
             <option value="en">English</option>
             <option value="ja">日本語</option>
             <option value="zh">中文</option>
           </select>
-          <label className="cursor-pointer rounded-full border hairline bg-[color:var(--paper)]/60 px-4 py-2 text-[12px] text-[color:var(--ink-muted)] backdrop-blur-sm hover:text-[color:var(--ink)] hover:border-[color:var(--rule-strong)]">
-            파일 올리기
+          <label className="cursor-pointer rounded-full border hairline bg-[color:var(--paper)]/60 px-3 py-1.5 text-[11px] text-[color:var(--ink-muted)] backdrop-blur-sm hover:text-[color:var(--ink)] hover:border-[color:var(--rule-strong)]">
+            파일
             <input
               type="file"
               accept="audio/*"
@@ -536,14 +531,14 @@ export default function BookView({
         </div>
 
         {/* divider */}
-        <div className="flex w-full items-center gap-3">
+        <div className="my-4 flex items-center gap-3">
           <div className="h-px flex-1 bg-[color:var(--rule)]" />
-          <span className="text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)]">또는 직접 적기</span>
+          <span className="text-[10px] tracking-wider text-[color:var(--ink-soft)]">직접 적기</span>
           <div className="h-px flex-1 bg-[color:var(--rule)]" />
         </div>
 
         {/* text input */}
-        <div className="flex w-full flex-col gap-3">
+        <div className="flex items-start gap-3">
           <textarea
             ref={textRef}
             value={textDraft}
@@ -554,24 +549,19 @@ export default function BookView({
                 submitText();
               }
             }}
-            placeholder={tab === "underlines" ? "마음에 남은 문장을 적어보세요…" : "지금 떠오르는 생각을 적어보세요…"}
-            rows={2}
-            className="prose-reading w-full resize-none rounded-xl border hairline bg-[color:var(--paper)]/60 px-4 py-3 text-[14px] placeholder:italic placeholder:text-[color:var(--ink-soft)] focus:border-[color:var(--accent)] backdrop-blur-sm"
+            placeholder={tab === "underlines" ? "마음에 남은 문장을 적어보세요…" : "떠오르는 생각을 적어보세요…"}
+            rows={1}
+            className="prose-reading min-h-[2.4rem] flex-1 resize-none rounded-xl border hairline bg-[color:var(--paper)]/60 px-3 py-2 text-[13px] leading-relaxed placeholder:italic placeholder:text-[color:var(--ink-soft)] focus:border-[color:var(--accent)] backdrop-blur-sm"
           />
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-[color:var(--ink-soft)]">
-              ⌘S / Ctrl+Enter 로 저장
-            </span>
-            <button
-              type="button"
-              onClick={submitText}
-              disabled={!textDraft.trim() || textSaving}
-              className="rounded-full px-5 py-1.5 text-[11px] uppercase tracking-wider text-[color:var(--paper)] disabled:opacity-40"
-              style={{ background: "var(--accent)" }}
-            >
-              {textSaving ? "저장 중…" : "남기기"}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={submitText}
+            disabled={!textDraft.trim() || textSaving}
+            className="shrink-0 rounded-full px-4 py-2 text-[11px] tracking-wider text-[color:var(--paper)] disabled:opacity-40"
+            style={{ background: "var(--accent)" }}
+          >
+            {textSaving ? "…" : "남기기"}
+          </button>
         </div>
       </section>
       )}
