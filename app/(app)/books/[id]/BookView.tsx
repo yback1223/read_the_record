@@ -219,12 +219,6 @@ export default function BookView({
     }
   }
 
-  async function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (f) await uploadRecording(f);
-    e.target.value = "";
-  }
-
   async function deleteRecording(id: string) {
     if (!confirm("이 녹음을 지울까요?")) return;
     const res = await fetch(`/api/recordings/${id}`, { method: "DELETE" });
@@ -504,31 +498,6 @@ export default function BookView({
                 ? "눌러서 문장을 읽어보세요"
                 : "눌러서 생각을 말해보세요"}
         </p>
-
-        {/* controls row */}
-        <div className="mt-3 flex items-center gap-2">
-          <select
-            id="lang"
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            aria-label="언어"
-            className="rounded-full border hairline bg-[color:var(--paper)]/60 px-3 py-1.5 text-[11px] text-[color:var(--ink-muted)] backdrop-blur-sm"
-          >
-            <option value="ko">한국어</option>
-            <option value="en">English</option>
-            <option value="ja">日本語</option>
-            <option value="zh">中文</option>
-          </select>
-          <label className="cursor-pointer rounded-full border hairline bg-[color:var(--paper)]/60 px-3 py-1.5 text-[11px] text-[color:var(--ink-muted)] backdrop-blur-sm hover:text-[color:var(--ink)] hover:border-[color:var(--rule-strong)]">
-            파일
-            <input
-              type="file"
-              accept="audio/*"
-              className="hidden"
-              onChange={onFilePicked}
-            />
-          </label>
-        </div>
 
         {/* divider */}
         <div className="my-4 flex items-center gap-3">
