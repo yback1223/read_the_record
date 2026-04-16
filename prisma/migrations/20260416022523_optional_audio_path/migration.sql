@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Recording" ALTER COLUMN "audioPath" DROP NOT NULL,
+ALTER COLUMN "mimeType" DROP NOT NULL;

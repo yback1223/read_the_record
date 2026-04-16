@@ -14,20 +14,45 @@ export async function POST(
 ) {
   try {
     const { userId } = await requireApproved();
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "GROQ_API_KEY is not set." },
-        { status: 500 },
-      );
-    }
-
     const { id: bookId } = await params;
     const book = await prisma.book.findFirst({
       where: { id: bookId, userId },
     });
     if (!book) {
       return NextResponse.json({ error: "book not found" }, { status: 404 });
+    }
+
+    const contentType = req.headers.get("content-type") ?? "";
+
+    // ── Text-only entry ──
+    if (contentType.includes("application/json")) {
+      const body = await req.json();
+      const text = (body.transcript ?? "").trim();
+      if (!text) {
+        return NextResponse.json({ error: "transcript required" }, { status: 400 });
+      }
+      const rawType = body.type ?? "underline";
+      const recordingType = rawType === "whisper" ? "whisper" as const : "underline" as const;
+      const page = typeof body.page === "number" ? body.page : null;
+
+      const recording = await prisma.recording.create({
+        data: {
+          bookId,
+          transcript: text,
+          type: recordingType,
+          page,
+        },
+      });
+      return NextResponse.json(recording, { status: 201 });
+    }
+
+    // ── Audio recording entry ──
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "GROQ_API_KEY is not set." },
+        { status: 500 },
+      );
     }
 
     const form = await req.formData();

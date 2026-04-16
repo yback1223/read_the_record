@@ -69,12 +69,14 @@ export async function DELETE(
       return NextResponse.json({ error: "not found" }, { status: 404 });
     }
     await prisma.recording.delete({ where: { id } });
-    try {
-      await getSupabaseAdmin()
-        .storage.from(RECORDINGS_BUCKET)
-        .remove([rec.audioPath]);
-    } catch {
-      // ignore
+    if (rec.audioPath) {
+      try {
+        await getSupabaseAdmin()
+          .storage.from(RECORDINGS_BUCKET)
+          .remove([rec.audioPath]);
+      } catch {
+        // ignore
+      }
     }
     return NextResponse.json({ ok: true });
   } catch (err) {

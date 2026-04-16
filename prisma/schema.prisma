@@ -69,8 +69,8 @@ model Recording {
   id         String        @id @default(cuid())
   bookId     String
   book       Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  audioPath  String
-  mimeType   String
+  audioPath  String?
+  mimeType   String?
   transcript String
   type       RecordingType @default(underline)
   page       Int?

@@ -9,8 +9,8 @@ type RecordingType = "underline" | "whisper";
 
 type Recording = {
   id: string;
-  audioPath: string;
-  mimeType: string;
+  audioPath: string | null;
+  mimeType: string | null;
   transcript: string;
   type: RecordingType;
   page: number | null;
@@ -47,9 +47,13 @@ export default function BookView({
   const [pageEditId, setPageEditId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [tab, setTab] = useState<"underlines" | "whispers" | "reflection">("underlines");
+  const tabContainerRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [textDraft, setTextDraft] = useState("");
+  const [textSaving, setTextSaving] = useState(false);
+  const textRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -233,6 +237,32 @@ export default function BookView({
     if (res.ok) router.push("/");
   }
 
+  async function submitText() {
+    const text = textDraft.trim();
+    if (!text) return;
+    setTextSaving(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/books/${bookId}/recordings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transcript: text,
+          type: tab === "whispers" ? "whisper" : "underline",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "저장 실패");
+      setTextDraft("");
+      if (data?.id) setPageEditId(data.id);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "저장 실패");
+    } finally {
+      setTextSaving(false);
+    }
+  }
+
   function formatElapsed(sec: number) {
     const m = Math.floor(sec / 60)
       .toString()
@@ -346,7 +376,17 @@ export default function BookView({
       </header>
 
       <div className="flex flex-col gap-3">
-        <div className="flex items-center rounded-full border hairline bg-[color:var(--paper-2)] p-1">
+        <div ref={tabContainerRef} className="relative flex items-center rounded-full border hairline bg-[color:var(--paper-2)] p-1">
+          {/* sliding indicator */}
+          <div
+            className="tab-indicator absolute rounded-full bg-[color:var(--ink)]"
+            style={{
+              width: `calc(${100 / 3}% - 2px)`,
+              height: "calc(100% - 8px)",
+              top: 4,
+              left: `calc(${(tab === "underlines" ? 0 : tab === "whispers" ? 1 : 2) * (100 / 3)}% + 1px)`,
+            }}
+          />
           {([
             { key: "underlines" as const, label: "밑줄", count: book.recordings.filter(r => r.type === "underline").length },
             { key: "whispers" as const, label: "속삭임", count: book.recordings.filter(r => r.type === "whisper").length },
@@ -356,9 +396,9 @@ export default function BookView({
               key={t.key}
               type="button"
               onClick={() => setTab(t.key)}
-              className={`flex-1 rounded-full py-2 text-[12px] tracking-wide ${
+              className={`relative z-10 flex-1 rounded-full py-2 text-[12px] tracking-wide ${
                 tab === t.key
-                  ? "bg-[color:var(--ink)] text-[color:var(--paper)]"
+                  ? "text-[color:var(--paper)]"
                   : "text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
               }`}
             >
@@ -366,7 +406,7 @@ export default function BookView({
             </button>
           ))}
         </div>
-        <p className="px-1 text-center text-[12px] italic leading-relaxed text-[color:var(--ink-muted)]">
+        <p className="tab-fade px-1 text-center text-[12px] italic leading-relaxed text-[color:var(--ink-muted)]" key={tab}>
           {tab === "underlines"
             ? "마음에 닿은 문장을 목소리로 스쳐 적어두는 곳"
             : tab === "whispers"
@@ -376,7 +416,7 @@ export default function BookView({
       </div>
 
       {(tab === "underlines" || tab === "whispers") && (
-      <section className="recorder-card relative flex flex-col items-center gap-6 overflow-hidden rounded-[18px] px-6 py-10">
+      <section key={tab} className="tab-fade recorder-card relative flex flex-col items-center gap-6 overflow-hidden rounded-[18px] px-6 py-10">
         {/* warm gradient background */}
         <div className="pointer-events-none absolute inset-0 -z-10" style={{
           background: isRecording
@@ -493,15 +533,56 @@ export default function BookView({
             />
           </label>
         </div>
+
+        {/* divider */}
+        <div className="flex w-full items-center gap-3">
+          <div className="h-px flex-1 bg-[color:var(--rule)]" />
+          <span className="text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)]">또는 직접 적기</span>
+          <div className="h-px flex-1 bg-[color:var(--rule)]" />
+        </div>
+
+        {/* text input */}
+        <div className="flex w-full flex-col gap-3">
+          <textarea
+            ref={textRef}
+            value={textDraft}
+            onChange={(e) => setTextDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                submitText();
+              }
+            }}
+            placeholder={tab === "underlines" ? "마음에 남은 문장을 적어보세요…" : "지금 떠오르는 생각을 적어보세요…"}
+            rows={2}
+            className="prose-reading w-full resize-none rounded-xl border hairline bg-[color:var(--paper)]/60 px-4 py-3 text-[14px] placeholder:italic placeholder:text-[color:var(--ink-soft)] focus:border-[color:var(--accent)] backdrop-blur-sm"
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-[color:var(--ink-soft)]">
+              ⌘S / Ctrl+Enter 로 저장
+            </span>
+            <button
+              type="button"
+              onClick={submitText}
+              disabled={!textDraft.trim() || textSaving}
+              className="rounded-full px-5 py-1.5 text-[11px] uppercase tracking-wider text-[color:var(--paper)] disabled:opacity-40"
+              style={{ background: "var(--accent)" }}
+            >
+              {textSaving ? "저장 중…" : "남기기"}
+            </button>
+          </div>
+        </div>
       </section>
       )}
 
       {tab === "reflection" && (
-        <ReflectionEditor
-          bookId={book.id}
-          initial={book.reflection ?? ""}
-          recordings={book.recordings}
-        />
+        <div className="tab-fade">
+          <ReflectionEditor
+            bookId={book.id}
+            initial={book.reflection ?? ""}
+            recordings={book.recordings}
+          />
+        </div>
       )}
 
       {error && (
@@ -522,7 +603,7 @@ export default function BookView({
         const label = tab === "underlines" ? "밑줄" : "속삭임";
         const emptyMsg = tab === "underlines" ? "아직 남긴 문장이 없어요." : "아직 남긴 속삭임이 없어요.";
         return (
-      <section className="flex flex-col gap-5">
+      <section key={tab} className="tab-fade flex flex-col gap-5">
         <div className="flex items-center gap-3">
           <h2 className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
             {label}
@@ -797,12 +878,14 @@ function RecordingCard({
         </blockquote>
       )}
 
-      <audio
-        controls
-        preload="none"
-        src={`/api/recordings/${recording.id}/audio`}
-        className="mt-4 w-full"
-      />
+      {recording.audioPath && (
+        <audio
+          controls
+          preload="none"
+          src={`/api/recordings/${recording.id}/audio`}
+          className="mt-4 w-full"
+        />
+      )}
     </li>
   );
 }

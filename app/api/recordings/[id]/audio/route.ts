@@ -16,7 +16,7 @@ export async function GET(
       where: { id },
       include: { book: true },
     });
-    if (!rec || rec.book.userId !== userId) {
+    if (!rec || rec.book.userId !== userId || !rec.audioPath) {
       return new Response("not found", { status: 404 });
     }
 
