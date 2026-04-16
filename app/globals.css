@@ -243,3 +243,7 @@ button:focus-visible {
 .waveform-bar {
   transition: height 80ms ease-out, opacity 80ms ease-out, background 80ms ease-out;
 }
+
+.composer-textarea {
+  field-sizing: content;
+}

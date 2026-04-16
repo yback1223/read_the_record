@@ -411,7 +411,7 @@ export default function BookView({
 
       <div key={tab} className="tab-fade flex flex-col gap-10">
       {(tab === "underlines" || tab === "whispers") && (
-      <section className="recorder-card relative overflow-hidden rounded-[18px] px-5 py-5">
+      <section className="recorder-card relative overflow-hidden rounded-[18px]">
         {/* warm gradient background */}
         <div className="pointer-events-none absolute inset-0 -z-10" style={{
           background: isRecording
@@ -425,113 +425,97 @@ export default function BookView({
           </div>
         )}
 
-        {/* record row: button + waveform + timer */}
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={isRecording ? stopRecording : startRecording}
-            disabled={busy}
-            aria-label={isRecording ? "녹음 정지" : "녹음 시작"}
-            className={`recorder-btn recorder-btn--compact relative flex shrink-0 items-center justify-center rounded-full disabled:opacity-50 ${
-              isRecording ? "recorder-btn--active" : ""
-            }`}
-          >
-            <span className={`absolute inset-0 rounded-full ${isRecording ? "recorder-glow" : ""}`} />
-            <span
-              className={`relative z-10 block ${isRecording ? "rounded-[3px]" : "rounded-full"}`}
-              style={{
-                width: isRecording ? 12 : 14,
-                height: isRecording ? 12 : 14,
-                background: "var(--paper)",
+        {isRecording ? (
+          /* ── Recording state: waveform fills the card ── */
+          <div className="flex flex-col gap-3 px-5 py-5">
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={stopRecording}
+                disabled={busy}
+                aria-label="녹음 정지"
+                className="recorder-btn recorder-btn--compact recorder-btn--active relative flex shrink-0 items-center justify-center rounded-full disabled:opacity-50"
+              >
+                <span className="recorder-glow absolute inset-0 rounded-full" />
+                <span className="relative z-10 block rounded-[3px]" style={{ width: 12, height: 12, background: "var(--paper)" }} />
+              </button>
+
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <div className="flex h-10 items-end gap-[2px]">
+                  {waveform.map((v, i) => (
+                    <div
+                      key={i}
+                      className="waveform-bar flex-1 rounded-full"
+                      style={{
+                        height: Math.max(2, v * 36),
+                        opacity: 0.3 + v * 0.7,
+                        background: `color-mix(in oklab, var(--accent) ${Math.round(50 + v * 50)}%, var(--accent-soft))`,
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="h-[2px] w-full overflow-hidden rounded-full bg-[color:var(--rule)]">
+                  <div className="waveform-bar h-full rounded-full" style={{ width: `${Math.min(100, (elapsed / MAX_RECORDING_SECONDS) * 100)}%`, background: "var(--accent)" }} />
+                </div>
+              </div>
+
+              <div className="shrink-0 serif tabular-nums text-[14px] text-[color:var(--accent)]">
+                {formatElapsed(elapsed)}
+                <span className="text-[10px] text-[color:var(--ink-soft)]"> / {formatElapsed(MAX_RECORDING_SECONDS)}</span>
+              </div>
+            </div>
+            <p className="text-center text-[11px] italic text-[color:var(--ink-muted)]">
+              듣고 있어요… 다시 누르면 멈춰요
+            </p>
+          </div>
+        ) : (
+          /* ── Idle state: text field + mic button ── */
+          <div className="flex items-end gap-2 px-4 py-4">
+            <textarea
+              ref={textRef}
+              value={textDraft}
+              onChange={(e) => setTextDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  submitText();
+                }
               }}
+              placeholder={tab === "underlines" ? "마음에 남은 문장을 적어보세요…" : "떠오르는 생각을 적어보세요…"}
+              rows={1}
+              className="composer-textarea prose-reading min-h-[2.6rem] max-h-32 flex-1 resize-none rounded-2xl border hairline bg-[color:var(--paper)]/60 px-4 py-2.5 text-[13px] leading-relaxed placeholder:italic placeholder:text-[color:var(--ink-soft)] focus:border-[color:var(--accent)] backdrop-blur-sm"
             />
-          </button>
-
-          {/* waveform + progress */}
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <div className="flex h-10 items-end gap-[2px]">
-              {waveform.map((v, i) => {
-                const idle = !isRecording;
-                const h = idle
-                  ? 2 + Math.sin(i * 0.6) * 1.5
-                  : Math.max(2, v * 36);
-                return (
-                  <div
-                    key={i}
-                    className="waveform-bar flex-1 rounded-full"
-                    style={{
-                      height: h,
-                      opacity: idle ? 0.2 : 0.3 + v * 0.7,
-                      background: idle
-                        ? "var(--ink-soft)"
-                        : `color-mix(in oklab, var(--accent) ${Math.round(50 + v * 50)}%, var(--accent-soft))`,
-                    }}
-                  />
-                );
-              })}
-            </div>
-            <div className="h-[2px] w-full overflow-hidden rounded-full bg-[color:var(--rule)]">
-              <div
-                className="waveform-bar h-full rounded-full"
-                style={{
-                  width: `${Math.min(100, (elapsed / MAX_RECORDING_SECONDS) * 100)}%`,
-                  background: "var(--accent)",
-                }}
-              />
-            </div>
+            {textDraft.trim() ? (
+              <button
+                type="button"
+                onClick={submitText}
+                disabled={textSaving}
+                aria-label="남기기"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[color:var(--paper)] disabled:opacity-50"
+                style={{ background: "var(--accent)" }}
+              >
+                {textSaving ? (
+                  <span className="block h-3 w-3 animate-spin rounded-full border-2 border-[color:var(--paper)] border-t-transparent" />
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2 L2 8.5 L6.5 10 L14 2Z" />
+                    <path d="M6.5 10 L8 14.5 L14 2" />
+                  </svg>
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={startRecording}
+                disabled={busy}
+                aria-label="녹음 시작"
+                className="recorder-btn recorder-btn--compact relative flex shrink-0 items-center justify-center rounded-full disabled:opacity-50"
+              >
+                <span className="relative z-10 block rounded-full" style={{ width: 14, height: 14, background: "var(--paper)" }} />
+              </button>
+            )}
           </div>
-
-          {/* timer */}
-          <div className={`shrink-0 serif tabular-nums text-[14px] ${isRecording ? "text-[color:var(--accent)]" : "text-[color:var(--ink-muted)]"}`}>
-            {formatElapsed(elapsed)}
-            <span className="text-[10px] text-[color:var(--ink-soft)]"> / {formatElapsed(MAX_RECORDING_SECONDS)}</span>
-          </div>
-        </div>
-
-        {/* hint */}
-        <p className="mt-2 text-center text-[11px] italic text-[color:var(--ink-muted)]">
-          {busy
-            ? "목소리를 글로 옮기는 중…"
-            : isRecording
-              ? "듣고 있어요… 다시 누르면 멈춰요"
-              : tab === "underlines"
-                ? "눌러서 문장을 읽어보세요"
-                : "눌러서 생각을 말해보세요"}
-        </p>
-
-        {/* divider */}
-        <div className="my-4 flex items-center gap-3">
-          <div className="h-px flex-1 bg-[color:var(--rule)]" />
-          <span className="text-[10px] tracking-wider text-[color:var(--ink-soft)]">직접 적기</span>
-          <div className="h-px flex-1 bg-[color:var(--rule)]" />
-        </div>
-
-        {/* text input */}
-        <div className="flex items-start gap-3">
-          <textarea
-            ref={textRef}
-            value={textDraft}
-            onChange={(e) => setTextDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                submitText();
-              }
-            }}
-            placeholder={tab === "underlines" ? "마음에 남은 문장을 적어보세요…" : "떠오르는 생각을 적어보세요…"}
-            rows={1}
-            className="prose-reading min-h-[2.4rem] flex-1 resize-none rounded-xl border hairline bg-[color:var(--paper)]/60 px-3 py-2 text-[13px] leading-relaxed placeholder:italic placeholder:text-[color:var(--ink-soft)] focus:border-[color:var(--accent)] backdrop-blur-sm"
-          />
-          <button
-            type="button"
-            onClick={submitText}
-            disabled={!textDraft.trim() || textSaving}
-            className="shrink-0 rounded-full px-4 py-2 text-[11px] tracking-wider text-[color:var(--paper)] disabled:opacity-40"
-            style={{ background: "var(--accent)" }}
-          >
-            {textSaving ? "…" : "남기기"}
-          </button>
-        </div>
+        )}
       </section>
       )}
 
@@ -838,13 +822,118 @@ function RecordingCard({
       )}
 
       {recording.audioPath && (
-        <audio
-          controls
-          preload="none"
-          src={`/api/recordings/${recording.id}/audio`}
-          className="mt-4 w-full"
-        />
+        <AudioPlayer src={`/api/recordings/${recording.id}/audio`} />
       )}
     </li>
+  );
+}
+
+function AudioPlayer({ src }: { src: string }) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+
+  function toggle() {
+    const el = audioRef.current;
+    if (!el) return;
+    if (playing) {
+      el.pause();
+    } else {
+      el.play();
+    }
+  }
+
+  function seek(e: React.MouseEvent<HTMLDivElement>) {
+    const el = audioRef.current;
+    if (!el || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    el.currentTime = ratio * duration;
+  }
+
+  function fmt(sec: number) {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  }
+
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  return (
+    <div className="mt-3 flex items-center gap-3">
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        onLoadedMetadata={() => {
+          if (audioRef.current) {
+            setDuration(audioRef.current.duration);
+            setLoaded(true);
+          }
+        }}
+        onTimeUpdate={() => {
+          if (audioRef.current) setCurrentTime(audioRef.current.currentTime);
+        }}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => {
+          setPlaying(false);
+          setCurrentTime(0);
+        }}
+      />
+
+      {/* play/pause */}
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={!loaded}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border hairline text-[color:var(--accent)] hover:bg-[color:var(--paper)] disabled:opacity-40"
+        aria-label={playing ? "일시정지" : "재생"}
+      >
+        {playing ? (
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+            <rect x="1.5" y="1" width="3" height="10" rx="0.8" />
+            <rect x="7.5" y="1" width="3" height="10" rx="0.8" />
+          </svg>
+        ) : (
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+            <path d="M2.5 1.2 L10.5 6 L2.5 10.8Z" />
+          </svg>
+        )}
+      </button>
+
+      {/* progress bar */}
+      <div
+        className="group relative flex h-8 flex-1 cursor-pointer items-center"
+        onClick={seek}
+      >
+        <div className="h-[3px] w-full overflow-hidden rounded-full bg-[color:var(--rule)]">
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${progress}%`,
+              background: "var(--accent)",
+              transition: "width 100ms linear",
+            }}
+          />
+        </div>
+        {/* thumb */}
+        <div
+          className="absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full opacity-0 group-hover:opacity-100"
+          style={{
+            left: `calc(${progress}% - 5px)`,
+            background: "var(--accent)",
+            transition: "left 100ms linear, opacity 160ms",
+          }}
+        />
+      </div>
+
+      {/* time */}
+      <span className="shrink-0 text-[10px] tabular-nums text-[color:var(--ink-soft)]">
+        {fmt(currentTime)}/{fmt(duration || 0)}
+      </span>
+    </div>
   );
 }
