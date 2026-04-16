@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { authErrorResponse, requireSuperAdmin } from "@/lib/auth";
+import { cacheDel } from "@/lib/cache";
 
 export const runtime = "nodejs";
 
@@ -38,6 +39,7 @@ export async function PATCH(
       where: { userId },
       data,
     });
+    await cacheDel(`profile:${userId}`);
     return NextResponse.json(profile);
   } catch (err) {
     return authErrorResponse(err);

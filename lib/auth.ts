@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { cacheGet, cacheSet, cacheDel } from "@/lib/cache";
 import type { Profile } from "@prisma/client";
+
+function profileCacheKey(userId: string) {
+  return `profile:${userId}`;
+}
 
 export class AuthError extends Error {
   constructor(
@@ -26,6 +31,18 @@ export const ensureProfile = cache(async function ensureProfileImpl(
   email: string,
   nickname?: string | null,
 ): Promise<Profile> {
+  // Try Redis cache first
+  const cached = await cacheGet<Profile>(profileCacheKey(userId));
+  if (cached && (!nickname || cached.nickname)) {
+    // If super admin promotion needed, skip cache
+    if (
+      !isSuperAdminEmail(email) ||
+      (cached.role === "super_admin" && cached.status === "approved")
+    ) {
+      return cached;
+    }
+  }
+
   const existing = await prisma.profile.findUnique({ where: { userId } });
   if (existing) {
     const updates: { role?: "super_admin"; status?: "approved"; approvedAt?: Date; nickname?: string } = {};
@@ -41,12 +58,15 @@ export const ensureProfile = cache(async function ensureProfileImpl(
       updates.nickname = nickname;
     }
     if (Object.keys(updates).length > 0) {
-      return prisma.profile.update({ where: { userId }, data: updates });
+      const updated = await prisma.profile.update({ where: { userId }, data: updates });
+      await cacheSet(profileCacheKey(userId), updated, 60);
+      return updated;
     }
+    await cacheSet(profileCacheKey(userId), existing, 60);
     return existing;
   }
   const isAdmin = isSuperAdminEmail(email);
-  return prisma.profile.create({
+  const created = await prisma.profile.create({
     data: {
       userId,
       email,
@@ -56,6 +76,8 @@ export const ensureProfile = cache(async function ensureProfileImpl(
       approvedAt: isAdmin ? new Date() : null,
     },
   });
+  await cacheSet(profileCacheKey(userId), created, 60);
+  return created;
 });
 
 export async function requireUser(): Promise<{

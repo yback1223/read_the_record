@@ -20,7 +20,6 @@ function isPublic(pathname: string): boolean {
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Public paths: just refresh cookies, no auth check, no redirect logic
   if (isPublic(pathname)) {
     return NextResponse.next({ request: req });
   }
@@ -48,11 +47,13 @@ export async function middleware(req: NextRequest) {
     },
   );
 
+  // getSession() reads JWT from cookie locally — NO HTTP roundtrip.
+  // Full validation (getUser) happens in server components (layout/page).
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  if (!user) {
+  if (!session) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
