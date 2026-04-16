@@ -47,6 +47,7 @@ export default function BookView({
   const [pageEditId, setPageEditId] = useState<string | null>(null);
   const [pageModalDraft, setPageModalDraft] = useState("");
   const [pageModalSaving, setPageModalSaving] = useState(false);
+  const [pageModalClosing, setPageModalClosing] = useState(false);
   const pageModalRef = useRef<HTMLInputElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [tab, setTab] = useState<"underlines" | "whispers" | "reflection">("underlines");
@@ -57,6 +58,7 @@ export default function BookView({
   const [textDraft, setTextDraft] = useState("");
   const [textSaving, setTextSaving] = useState(false);
   const textRef = useRef<HTMLTextAreaElement | null>(null);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -224,8 +226,11 @@ export default function BookView({
 
   async function deleteRecording(id: string) {
     if (!confirm("이 녹음을 지울까요?")) return;
+    setDeletingIds((s) => new Set(s).add(id));
+    await new Promise((r) => setTimeout(r, 350));
     const res = await fetch(`/api/recordings/${id}`, { method: "DELETE" });
     if (res.ok) await load();
+    setDeletingIds((s) => { const n = new Set(s); n.delete(id); return n; });
   }
 
   async function deleteBook() {
@@ -254,13 +259,16 @@ export default function BookView({
       );
     }
     setPageModalSaving(false);
-    setPageEditId(null);
-    setPageModalDraft("");
+    closePageModal();
   }
 
-  function dismissPageModal() {
-    setPageEditId(null);
-    setPageModalDraft("");
+  function closePageModal() {
+    setPageModalClosing(true);
+    setTimeout(() => {
+      setPageEditId(null);
+      setPageModalDraft("");
+      setPageModalClosing(false);
+    }, 250);
   }
 
   // Focus page modal input when it opens
@@ -477,18 +485,12 @@ export default function BookView({
               inset: isRecording ? undefined : 0,
             }}
           >
-            <div className="flex flex-col gap-3 px-5 py-5">
-              <div className="flex items-center gap-4">
-                <button
-                  type="button"
-                  onClick={stopRecording}
-                  disabled={busy}
-                  aria-label="녹음 정지"
-                  className="recorder-btn recorder-btn--compact recorder-btn--active relative flex shrink-0 items-center justify-center rounded-full disabled:opacity-50"
-                >
-                  <span className="recorder-glow absolute inset-0 rounded-full" />
-                  <span className="relative z-10 block rounded-[3px]" style={{ width: 12, height: 12, background: "var(--paper)" }} />
-                </button>
+            <div className="flex flex-col gap-2 px-4 py-4">
+              <div className="flex items-center gap-3">
+                <div className="shrink-0 serif tabular-nums text-[14px] text-[color:var(--accent)]">
+                  {formatElapsed(elapsed)}
+                  <span className="text-[10px] text-[color:var(--ink-soft)]"> / {formatElapsed(MAX_RECORDING_SECONDS)}</span>
+                </div>
 
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                   <div className="flex h-10 items-end gap-[2px]">
@@ -509,10 +511,20 @@ export default function BookView({
                   </div>
                 </div>
 
-                <div className="shrink-0 serif tabular-nums text-[14px] text-[color:var(--accent)]">
-                  {formatElapsed(elapsed)}
-                  <span className="text-[10px] text-[color:var(--ink-soft)]"> / {formatElapsed(MAX_RECORDING_SECONDS)}</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={stopRecording}
+                  disabled={busy}
+                  aria-label="녹음 정지"
+                  className="composer-layer flex h-10 w-10 shrink-0 items-center justify-center rounded-full disabled:opacity-50"
+                  style={{
+                    background: "linear-gradient(135deg, var(--accent-soft) 0%, var(--accent) 100%)",
+                    boxShadow: "0 4px 20px -4px color-mix(in oklab, var(--accent) 40%, transparent)",
+                  }}
+                >
+                  <span className="recorder-glow absolute inset-0 rounded-full" />
+                  <span className="relative z-10 block rounded-[3px]" style={{ width: 10, height: 10, background: "var(--paper)" }} />
+                </button>
               </div>
               <p className="text-center text-[11px] italic text-[color:var(--ink-muted)]">
                 듣고 있어요… 다시 누르면 멈춰요
@@ -649,6 +661,7 @@ export default function BookView({
               key={r.id}
               recording={r}
               formattedDate={formatDate(r.createdAt)}
+              deleting={deletingIds.has(r.id)}
               onDelete={() => deleteRecording(r.id)}
               onSaved={(updated) => {
                 setBook((prev) =>
@@ -672,9 +685,9 @@ export default function BookView({
 
       {/* page number modal */}
       {pageEditId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={dismissPageModal} />
-          <div className="page-modal relative z-10 mx-6 flex w-full max-w-xs flex-col items-center gap-5 rounded-2xl border hairline bg-[color:var(--paper-2)] px-8 py-8 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.4)]">
+        <div className={`fixed inset-0 z-50 flex items-center justify-center ${pageModalClosing ? "modal-backdrop-out" : "modal-backdrop-in"}`}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closePageModal} />
+          <div className={`relative z-10 mx-6 flex w-full max-w-xs flex-col items-center gap-5 rounded-2xl border hairline bg-[color:var(--paper-2)] px-8 py-8 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.4)] ${pageModalClosing ? "page-modal-out" : "page-modal"}`}>
             <p className="serif text-center text-[18px] leading-snug text-[color:var(--ink)]">
               몇 페이지에서<br />남기셨나요?
             </p>
@@ -687,7 +700,7 @@ export default function BookView({
               onChange={(e) => setPageModalDraft(e.target.value.replace(/\D/g, ""))}
               onKeyDown={(e) => {
                 if (e.key === "Enter") { e.preventDefault(); savePageModal(); }
-                if (e.key === "Escape") { e.preventDefault(); dismissPageModal(); }
+                if (e.key === "Escape") { e.preventDefault(); closePageModal(); }
               }}
               placeholder="페이지 번호"
               className="w-full rounded-xl border hairline bg-[color:var(--paper)] px-4 py-3 text-center text-[16px] tabular-nums text-[color:var(--ink)] outline-none focus:border-[color:var(--accent)]"
@@ -695,7 +708,7 @@ export default function BookView({
             <div className="flex w-full gap-3">
               <button
                 type="button"
-                onClick={dismissPageModal}
+                onClick={closePageModal}
                 className="flex-1 rounded-full border hairline py-2.5 text-[12px] tracking-wide text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
               >
                 건너뛰기
@@ -720,11 +733,13 @@ export default function BookView({
 function RecordingCard({
   recording,
   formattedDate,
+  deleting,
   onDelete,
   onSaved,
 }: {
   recording: Recording;
   formattedDate: string;
+  deleting?: boolean;
   onDelete: () => void;
   onSaved: (r: Recording) => void;
 }) {
@@ -805,7 +820,7 @@ function RecordingCard({
   }
 
   return (
-    <li ref={cardRef} className="paper-card fade-up px-6 py-6">
+    <li ref={cardRef} className={`paper-card fade-up px-6 py-6 ${deleting ? "card-exit" : ""}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <time className="text-[11px] uppercase tracking-wider text-[color:var(--ink-soft)]">
@@ -872,7 +887,7 @@ function RecordingCard({
       </div>
 
       {editing ? (
-        <div className="mt-4 flex flex-col gap-3">
+        <div className="fade-up mt-4 flex flex-col gap-3">
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -997,16 +1012,15 @@ function AudioPlayer({ src }: { src: string }) {
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border hairline text-[color:var(--accent)] hover:bg-[color:var(--paper)] disabled:opacity-40"
         aria-label={playing ? "일시정지" : "재생"}
       >
-        {playing ? (
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+        <span className="relative h-3 w-3">
+          <svg className="composer-layer absolute inset-0" width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style={{ opacity: playing ? 1 : 0, transform: playing ? "scale(1)" : "scale(0.6)" }}>
             <rect x="1.5" y="1" width="3" height="10" rx="0.8" />
             <rect x="7.5" y="1" width="3" height="10" rx="0.8" />
           </svg>
-        ) : (
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+          <svg className="composer-layer absolute inset-0" width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style={{ opacity: playing ? 0 : 1, transform: playing ? "scale(0.6)" : "scale(1)" }}>
             <path d="M2.5 1.2 L10.5 6 L2.5 10.8Z" />
           </svg>
-        )}
+        </span>
       </button>
 
       {/* progress bar */}

@@ -269,17 +269,65 @@ button:focus-visible {
   }
 }
 
-@keyframes page-modal-in {
-  from {
-    opacity: 0;
-    transform: scale(0.92) translateY(10px);
-  }
+/* ── Card exit ── */
+
+@keyframes card-exit {
   to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
+    opacity: 0;
+    transform: translateX(-20px) scale(0.97);
   }
+}
+
+.card-exit {
+  animation: card-exit 350ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  pointer-events: none;
+}
+
+/* ── Page modal ── */
+
+@keyframes page-modal-in {
+  from { opacity: 0; transform: scale(0.92) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes page-modal-out {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.92) translateY(10px); }
+}
+
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
 .page-modal {
   animation: page-modal-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.page-modal-out {
+  animation: page-modal-out 250ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.modal-backdrop-in {
+  animation: backdrop-in 250ms ease both;
+}
+
+.modal-backdrop-out {
+  animation: backdrop-out 250ms ease both;
+}
+
+/* ── Slash menu ── */
+
+@keyframes slash-menu-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.slash-menu {
+  animation: slash-menu-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }

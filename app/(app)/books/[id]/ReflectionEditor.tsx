@@ -311,7 +311,7 @@ export default function ReflectionEditor({
 
         {slashOpen && (
           <div
-            className="absolute z-30 flex w-72 flex-col overflow-hidden rounded-lg border hairline bg-[color:var(--paper-2)] shadow-[0_18px_40px_-20px_rgba(70,50,20,0.35)]"
+            className="slash-menu absolute z-30 flex w-72 flex-col overflow-hidden rounded-lg border hairline bg-[color:var(--paper-2)] shadow-[0_18px_40px_-20px_rgba(70,50,20,0.35)]"
             style={{ top: slashPos.top, left: slashPos.left }}
           >
             {!slashCommand ? (
