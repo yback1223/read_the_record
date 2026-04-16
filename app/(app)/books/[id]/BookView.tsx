@@ -45,6 +45,9 @@ export default function BookView({
   const [language, setLanguage] = useState("ko");
 
   const [pageEditId, setPageEditId] = useState<string | null>(null);
+  const [pageModalDraft, setPageModalDraft] = useState("");
+  const [pageModalSaving, setPageModalSaving] = useState(false);
+  const pageModalRef = useRef<HTMLInputElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [tab, setTab] = useState<"underlines" | "whispers" | "reflection">("underlines");
   const tabContainerRef = useRef<HTMLDivElement | null>(null);
@@ -230,6 +233,43 @@ export default function BookView({
     const res = await fetch(`/api/books/${bookId}`, { method: "DELETE" });
     if (res.ok) router.push("/");
   }
+
+  async function savePageModal() {
+    if (!pageEditId) return;
+    const trimmed = pageModalDraft.trim();
+    const value = trimmed === "" ? null : Number(trimmed);
+    if (value !== null && (!Number.isInteger(value) || value < 0)) return;
+    setPageModalSaving(true);
+    const res = await fetch(`/api/recordings/${pageEditId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ page: value }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setBook((prev) =>
+        prev
+          ? { ...prev, recordings: prev.recordings.map((x) => x.id === updated.id ? { ...x, ...updated } : x) }
+          : prev,
+      );
+    }
+    setPageModalSaving(false);
+    setPageEditId(null);
+    setPageModalDraft("");
+  }
+
+  function dismissPageModal() {
+    setPageEditId(null);
+    setPageModalDraft("");
+  }
+
+  // Focus page modal input when it opens
+  useEffect(() => {
+    if (pageEditId) {
+      setPageModalDraft("");
+      requestAnimationFrame(() => pageModalRef.current?.focus());
+    }
+  }, [pageEditId]);
 
   async function submitText() {
     const text = textDraft.trim();
@@ -491,7 +531,7 @@ export default function BookView({
               inset: isRecording ? 0 : undefined,
             }}
           >
-            <div className="flex items-end gap-2 px-4 py-4">
+            <div className="flex items-center gap-2 px-4 py-4">
               <textarea
                 ref={textRef}
                 value={textDraft}
@@ -609,8 +649,6 @@ export default function BookView({
               key={r.id}
               recording={r}
               formattedDate={formatDate(r.createdAt)}
-              autoEditPage={pageEditId === r.id}
-              onPageEditConsumed={() => setPageEditId(null)}
               onDelete={() => deleteRecording(r.id)}
               onSaved={(updated) => {
                 setBook((prev) =>
@@ -631,6 +669,50 @@ export default function BookView({
         );
       })()}
       </div>
+
+      {/* page number modal */}
+      {pageEditId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={dismissPageModal} />
+          <div className="page-modal relative z-10 mx-6 flex w-full max-w-xs flex-col items-center gap-5 rounded-2xl border hairline bg-[color:var(--paper-2)] px-8 py-8 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.4)]">
+            <p className="serif text-center text-[18px] leading-snug text-[color:var(--ink)]">
+              몇 페이지에서<br />남기셨나요?
+            </p>
+            <input
+              ref={pageModalRef}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={pageModalDraft}
+              onChange={(e) => setPageModalDraft(e.target.value.replace(/\D/g, ""))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); savePageModal(); }
+                if (e.key === "Escape") { e.preventDefault(); dismissPageModal(); }
+              }}
+              placeholder="페이지 번호"
+              className="w-full rounded-xl border hairline bg-[color:var(--paper)] px-4 py-3 text-center text-[16px] tabular-nums text-[color:var(--ink)] outline-none focus:border-[color:var(--accent)]"
+            />
+            <div className="flex w-full gap-3">
+              <button
+                type="button"
+                onClick={dismissPageModal}
+                className="flex-1 rounded-full border hairline py-2.5 text-[12px] tracking-wide text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
+              >
+                건너뛰기
+              </button>
+              <button
+                type="button"
+                onClick={savePageModal}
+                disabled={pageModalSaving}
+                className="flex-1 rounded-full py-2.5 text-[12px] tracking-wide text-[color:var(--paper)] disabled:opacity-50"
+                style={{ background: "var(--accent)" }}
+              >
+                {pageModalSaving ? "저장 중…" : "저장"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -638,15 +720,11 @@ export default function BookView({
 function RecordingCard({
   recording,
   formattedDate,
-  autoEditPage,
-  onPageEditConsumed,
   onDelete,
   onSaved,
 }: {
   recording: Recording;
   formattedDate: string;
-  autoEditPage?: boolean;
-  onPageEditConsumed?: () => void;
   onDelete: () => void;
   onSaved: (r: Recording) => void;
 }) {
@@ -660,25 +738,8 @@ function RecordingCard({
     recording.page != null ? String(recording.page) : "",
   );
   const [savingPage, setSavingPage] = useState(false);
-  const [justCreated, setJustCreated] = useState(false);
   const pageInputRef = useRef<HTMLInputElement | null>(null);
   const cardRef = useRef<HTMLLIElement | null>(null);
-
-  useEffect(() => {
-    if (autoEditPage) {
-      setJustCreated(true);
-      setPageEditing(true);
-      requestAnimationFrame(() => {
-        cardRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
-        pageInputRef.current?.focus();
-      });
-      onPageEditConsumed?.();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoEditPage]);
 
   function startEdit() {
     setDraft(recording.transcript);
@@ -730,7 +791,6 @@ function RecordingCard({
     onSaved(updated);
     setSavingPage(false);
     setPageEditing(false);
-    setJustCreated(false);
   }
 
   function onPageKey(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -745,40 +805,7 @@ function RecordingCard({
   }
 
   return (
-    <li ref={cardRef} className={`paper-card fade-up px-6 py-6 ${justCreated ? "card-highlight" : ""}`}>
-      {justCreated && (
-        <div className="mb-4 flex items-center gap-3 rounded-xl border px-4 py-3" style={{ borderColor: "color-mix(in oklab, var(--accent) 40%, transparent)", background: "color-mix(in oklab, var(--accent) 6%, transparent)" }}>
-          <span className="text-[12px] text-[color:var(--ink-muted)]">몇 페이지에서 남기셨나요?</span>
-          <input
-            ref={pageInputRef}
-            type="number"
-            inputMode="numeric"
-            min={0}
-            value={pageDraft}
-            onChange={(e) => setPageDraft(e.target.value)}
-            onKeyDown={onPageKey}
-            placeholder="페이지"
-            disabled={savingPage}
-            className="w-20 rounded-lg border hairline bg-[color:var(--paper)] px-3 py-1.5 text-center text-[13px] text-[color:var(--ink)] outline-none focus:border-[color:var(--accent)]"
-          />
-          <button
-            type="button"
-            onClick={savePage}
-            disabled={savingPage}
-            className="rounded-full px-3 py-1.5 text-[11px] tracking-wider text-[color:var(--paper)]"
-            style={{ background: "var(--accent)" }}
-          >
-            {savingPage ? "..." : "저장"}
-          </button>
-          <button
-            type="button"
-            onClick={() => { setJustCreated(false); setPageEditing(false); }}
-            className="ml-auto text-[11px] text-[color:var(--ink-soft)] hover:text-[color:var(--ink)]"
-          >
-            건너뛰기
-          </button>
-        </div>
-      )}
+    <li ref={cardRef} className="paper-card fade-up px-6 py-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <time className="text-[11px] uppercase tracking-wider text-[color:var(--ink-soft)]">
@@ -789,11 +816,11 @@ function RecordingCard({
               <span className="text-[10px] uppercase tracking-wider">p.</span>
               <input
                 ref={pageInputRef}
-                type="number"
+                type="text"
                 inputMode="numeric"
-                min={0}
+                pattern="[0-9]*"
                 value={pageDraft}
-                onChange={(e) => setPageDraft(e.target.value)}
+                onChange={(e) => setPageDraft(e.target.value.replace(/\D/g, ""))}
                 onKeyDown={onPageKey}
                 onBlur={savePage}
                 disabled={savingPage}
