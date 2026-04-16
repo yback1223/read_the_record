@@ -502,7 +502,7 @@ export default function BookView({
                     submitText();
                   }
                 }}
-                placeholder={tab === "underlines" ? "문장을 적거나, 🎙 눌러 읽어보세요" : "생각을 적거나, 🎙 눌러 말해보세요"}
+                placeholder={tab === "underlines" ? "문장을 적거나, 녹음 버튼을 눌러 읽어보세요" : "생각을 적거나, 녹음 버튼을 눌러 말해보세요"}
                 rows={1}
                 disabled={isRecording}
                 className="composer-textarea prose-reading min-h-[2.6rem] max-h-32 flex-1 resize-none rounded-2xl border hairline bg-[color:var(--paper)]/60 px-4 py-2.5 text-[13px] leading-relaxed placeholder:italic placeholder:text-[color:var(--ink-soft)] focus:border-[color:var(--accent)] backdrop-blur-sm"
@@ -539,14 +539,19 @@ export default function BookView({
                   onClick={startRecording}
                   disabled={busy}
                   aria-label="녹음 시작"
-                  className="composer-layer recorder-btn recorder-btn--compact absolute inset-0 flex items-center justify-center rounded-full disabled:opacity-50"
+                  className="composer-layer absolute inset-0 flex items-center justify-center rounded-full disabled:opacity-50"
                   style={{
+                    background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-soft) 100%)",
+                    boxShadow: "0 4px 20px -4px color-mix(in oklab, var(--accent) 40%, transparent)",
                     opacity: textDraft.trim() ? 0 : 1,
                     transform: textDraft.trim() ? "scale(0.7)" : "scale(1)",
                     pointerEvents: textDraft.trim() ? "none" : "auto",
                   }}
                 >
-                  <span className="relative z-10 block rounded-full" style={{ width: 14, height: 14, background: "var(--paper)" }} />
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--paper)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="5.5" y="1.5" width="5" height="8" rx="2.5" />
+                    <path d="M3.5 7a4.5 4.5 0 0 0 9 0M8 12.5v2" />
+                  </svg>
                 </button>
               </div>
             </div>
@@ -655,11 +660,13 @@ function RecordingCard({
     recording.page != null ? String(recording.page) : "",
   );
   const [savingPage, setSavingPage] = useState(false);
+  const [justCreated, setJustCreated] = useState(false);
   const pageInputRef = useRef<HTMLInputElement | null>(null);
   const cardRef = useRef<HTMLLIElement | null>(null);
 
   useEffect(() => {
     if (autoEditPage) {
+      setJustCreated(true);
       setPageEditing(true);
       requestAnimationFrame(() => {
         cardRef.current?.scrollIntoView({
@@ -723,6 +730,7 @@ function RecordingCard({
     onSaved(updated);
     setSavingPage(false);
     setPageEditing(false);
+    setJustCreated(false);
   }
 
   function onPageKey(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -737,7 +745,40 @@ function RecordingCard({
   }
 
   return (
-    <li ref={cardRef} className="paper-card fade-up px-6 py-6">
+    <li ref={cardRef} className={`paper-card fade-up px-6 py-6 ${justCreated ? "card-highlight" : ""}`}>
+      {justCreated && (
+        <div className="mb-4 flex items-center gap-3 rounded-xl border px-4 py-3" style={{ borderColor: "color-mix(in oklab, var(--accent) 40%, transparent)", background: "color-mix(in oklab, var(--accent) 6%, transparent)" }}>
+          <span className="text-[12px] text-[color:var(--ink-muted)]">몇 페이지에서 남기셨나요?</span>
+          <input
+            ref={pageInputRef}
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={pageDraft}
+            onChange={(e) => setPageDraft(e.target.value)}
+            onKeyDown={onPageKey}
+            placeholder="페이지"
+            disabled={savingPage}
+            className="w-20 rounded-lg border hairline bg-[color:var(--paper)] px-3 py-1.5 text-center text-[13px] text-[color:var(--ink)] outline-none focus:border-[color:var(--accent)]"
+          />
+          <button
+            type="button"
+            onClick={savePage}
+            disabled={savingPage}
+            className="rounded-full px-3 py-1.5 text-[11px] tracking-wider text-[color:var(--paper)]"
+            style={{ background: "var(--accent)" }}
+          >
+            {savingPage ? "..." : "저장"}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setJustCreated(false); setPageEditing(false); }}
+            className="ml-auto text-[11px] text-[color:var(--ink-soft)] hover:text-[color:var(--ink)]"
+          >
+            건너뛰기
+          </button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <time className="text-[11px] uppercase tracking-wider text-[color:var(--ink-soft)]">
@@ -890,6 +931,7 @@ function AudioPlayer({ src }: { src: string }) {
   }
 
   function fmt(sec: number) {
+    if (!sec || !isFinite(sec)) return "0:00";
     const m = Math.floor(sec / 60);
     const s = Math.floor(sec % 60).toString().padStart(2, "0");
     return `${m}:${s}`;

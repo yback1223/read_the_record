@@ -256,3 +256,20 @@ button:focus-visible {
 .composer-glow {
   transition: opacity 400ms ease;
 }
+
+@keyframes card-highlight {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 30%, transparent);
+  }
+  40% {
+    box-shadow: 0 0 0 6px color-mix(in oklab, var(--accent) 18%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 0%, transparent);
+  }
+}
+
+.card-highlight {
+  animation: card-highlight 1.5s ease-out;
+  border-color: color-mix(in oklab, var(--accent) 35%, transparent);
+}
