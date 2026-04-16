@@ -68,6 +68,9 @@ export default function BookView({
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<number | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const [waveform, setWaveform] = useState<number[]>(new Array(32).fill(0));
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/books/${bookId}`, { cache: "no-store" });
@@ -78,6 +81,7 @@ export default function BookView({
   useEffect(() => {
     return () => {
       if (timerRef.current) window.clearInterval(timerRef.current);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
@@ -93,11 +97,47 @@ export default function BookView({
     return candidates.find((t) => MediaRecorder.isTypeSupported(t));
   }
 
+  function startWaveformLoop(analyser: AnalyserNode) {
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    const step = Math.floor(data.length / 32);
+    function tick() {
+      analyser.getByteFrequencyData(data);
+      const bars: number[] = [];
+      for (let i = 0; i < 32; i++) {
+        bars.push(data[i * step] / 255);
+      }
+      setWaveform(bars);
+      rafRef.current = requestAnimationFrame(tick);
+    }
+    tick();
+  }
+
+  function stopWaveformLoop() {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    // fade out
+    setWaveform(new Array(32).fill(0));
+    analyserRef.current = null;
+  }
+
   async function startRecording() {
     setError("");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
+
+      // Set up Web Audio analyser for waveform
+      const audioCtx = new AudioContext();
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.75;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+      startWaveformLoop(analyser);
+
       const mimeType = pickMimeType();
       const rec = new MediaRecorder(
         stream,
@@ -112,6 +152,8 @@ export default function BookView({
         const blob = new Blob(chunksRef.current, { type });
         streamRef.current?.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
+        stopWaveformLoop();
+        audioCtx.close();
         const file = new File(
           [blob],
           `recording-${Date.now()}.${type.includes("mp4") ? "mp4" : "webm"}`,
@@ -334,79 +376,115 @@ export default function BookView({
       </div>
 
       {(tab === "underlines" || tab === "whispers") && (
-      <section className="paper-card relative flex flex-col items-center gap-5 px-6 py-8">
+      <section className="recorder-card relative flex flex-col items-center gap-6 overflow-hidden rounded-[18px] px-6 py-10">
+        {/* warm gradient background */}
+        <div className="pointer-events-none absolute inset-0 -z-10" style={{
+          background: isRecording
+            ? "radial-gradient(ellipse at 50% 80%, color-mix(in oklab, var(--accent) 14%, transparent) 0%, transparent 70%)"
+            : "radial-gradient(ellipse at 50% 80%, color-mix(in oklab, var(--accent) 6%, transparent) 0%, transparent 70%)",
+        }} />
+
         {busy && (
-          <div className="fade-up absolute inset-0 z-10 flex items-center justify-center rounded-[14px] bg-[color:var(--paper-2)]/92 backdrop-blur-sm">
+          <div className="fade-up absolute inset-0 z-10 flex items-center justify-center rounded-[18px] bg-[color:var(--paper-2)]/92 backdrop-blur-sm">
             <BookshelfLoader label="목소리를 글로 옮기는 중…" />
           </div>
         )}
-        <div className="flex flex-col items-center gap-1">
-          <div className="serif text-[32px] tabular-nums tracking-wide text-[color:var(--ink)]">
+
+        {/* waveform visualization */}
+        <div className="flex h-20 items-end justify-center gap-[3px]">
+          {waveform.map((v, i) => {
+            const idle = !isRecording;
+            const h = idle
+              ? 3 + Math.sin(i * 0.6) * 2
+              : Math.max(3, v * 72);
+            return (
+              <div
+                key={i}
+                className="waveform-bar rounded-full"
+                style={{
+                  width: 3,
+                  height: h,
+                  opacity: idle ? 0.25 : 0.3 + v * 0.7,
+                  background: idle
+                    ? "var(--ink-soft)"
+                    : `color-mix(in oklab, var(--accent) ${Math.round(50 + v * 50)}%, var(--accent-soft))`,
+                }}
+              />
+            );
+          })}
+        </div>
+
+        {/* timer */}
+        <div className="flex flex-col items-center gap-2">
+          <div className={`serif tabular-nums tracking-wide ${isRecording ? "text-[color:var(--accent)]" : "text-[color:var(--ink-muted)]"}`} style={{ fontSize: isRecording ? 28 : 20 }}>
             {formatElapsed(elapsed)}
-            <span className="ml-2 text-[14px] text-[color:var(--ink-soft)]">
+            <span className="ml-1.5 text-[12px] text-[color:var(--ink-soft)]">
               / {formatElapsed(MAX_RECORDING_SECONDS)}
             </span>
           </div>
-          <div className="h-[3px] w-40 overflow-hidden rounded-full bg-[color:var(--rule)]">
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${Math.min(100, (elapsed / MAX_RECORDING_SECONDS) * 100)}%`,
-                background: "var(--accent)",
-                transitionDuration: "240ms",
-              }}
+          {/* subtle arc progress */}
+          <svg width="120" height="6" viewBox="0 0 120 6" className="overflow-visible">
+            <rect x="0" y="2" width="120" height="2" rx="1" fill="var(--rule)" />
+            <rect
+              x="0" y="2"
+              width={Math.min(120, (elapsed / MAX_RECORDING_SECONDS) * 120)}
+              height="2" rx="1"
+              fill="var(--accent)"
+              className="waveform-bar"
             />
-          </div>
+          </svg>
         </div>
 
+        {/* record button */}
         <button
           type="button"
           onClick={isRecording ? stopRecording : startRecording}
           disabled={busy}
           aria-label={isRecording ? "녹음 정지" : "녹음 시작"}
-          className={`relative flex h-20 w-20 items-center justify-center rounded-full border hairline bg-[color:var(--paper)] hover:scale-[1.02] active:scale-[0.97] disabled:opacity-50 ${
-            isRecording ? "pulse-soft" : ""
+          className={`recorder-btn relative flex items-center justify-center rounded-full disabled:opacity-50 ${
+            isRecording ? "recorder-btn--active" : ""
           }`}
-          style={{ transitionDuration: "300ms" }}
         >
-          {isRecording ? (
-            <span
-              className="block h-5 w-5 rounded-[3px]"
-              style={{ background: "var(--accent)" }}
-            />
-          ) : (
-            <span
-              className="block h-6 w-6 rounded-full"
-              style={{ background: "var(--accent)" }}
-            />
-          )}
+          {/* outer glow ring */}
+          <span className={`absolute inset-0 rounded-full ${isRecording ? "recorder-glow" : ""}`} />
+          {/* inner shape */}
+          <span
+            className={`relative z-10 block rounded-${isRecording ? "[4px]" : "full"}`}
+            style={{
+              width: isRecording ? 18 : 22,
+              height: isRecording ? 18 : 22,
+              background: "var(--paper)",
+            }}
+          />
         </button>
 
-        <p className="text-xs text-[color:var(--ink-muted)]">
+        {/* hint text */}
+        <p className="text-[12px] italic text-[color:var(--ink-muted)]">
           {busy
-            ? "문장을 옮기는 중…"
+            ? "목소리를 글로 옮기는 중…"
             : isRecording
-              ? `듣는 중 · 최대 ${MAX_RECORDING_SECONDS}초 · 다시 눌러 마침`
-              : `눌러서 녹음 시작 · 최대 ${MAX_RECORDING_SECONDS}초`}
+              ? "듣고 있어요… 다시 누르면 멈춰요"
+              : tab === "underlines"
+                ? "마음에 닿은 문장을 소리 내어 읽어보세요"
+                : "지금 떠오르는 생각을 자유롭게 말해보세요"}
         </p>
 
-        <div className="mt-2 flex w-full items-center gap-3">
-          <label htmlFor="lang" className="text-[11px] text-[color:var(--ink-soft)] uppercase tracking-wider">
-            언어
-          </label>
+        {/* bottom controls */}
+        <div className="flex w-full items-center gap-3">
           <select
             id="lang"
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
-            className="flex-1 rounded-lg border hairline bg-[color:var(--paper)] px-3 py-2 text-sm"
+            aria-label="언어"
+            className="flex-1 rounded-full border hairline bg-[color:var(--paper)]/60 px-4 py-2 text-[12px] text-[color:var(--ink-muted)] backdrop-blur-sm"
           >
             <option value="ko">한국어</option>
             <option value="en">English</option>
             <option value="ja">日本語</option>
             <option value="zh">中文</option>
           </select>
-          <label className="cursor-pointer rounded-lg border hairline px-3 py-2 text-[11px] uppercase tracking-wider text-[color:var(--ink-muted)] hover:text-[color:var(--ink)] hover:border-[color:var(--rule-strong)]">
-            파일
+          <label className="cursor-pointer rounded-full border hairline bg-[color:var(--paper)]/60 px-4 py-2 text-[12px] text-[color:var(--ink-muted)] backdrop-blur-sm hover:text-[color:var(--ink)] hover:border-[color:var(--rule-strong)]">
+            파일 올리기
             <input
               type="file"
               accept="audio/*"

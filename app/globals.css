@@ -163,3 +163,57 @@ button:focus-visible {
 .fade-up {
   animation: fade-up 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+/* ── Recorder ── */
+
+.recorder-card {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.02),
+    0 18px 50px -30px rgba(70, 50, 20, 0.22);
+}
+
+.recorder-btn {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-soft) 100%);
+  box-shadow:
+    0 4px 20px -4px color-mix(in oklab, var(--accent) 40%, transparent),
+    inset 0 1px 1px rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.recorder-btn:hover {
+  transform: scale(1.05);
+  box-shadow:
+    0 6px 28px -4px color-mix(in oklab, var(--accent) 50%, transparent),
+    inset 0 1px 1px rgba(255, 255, 255, 0.12);
+}
+
+.recorder-btn:active {
+  transform: scale(0.96);
+}
+
+.recorder-btn--active {
+  background: linear-gradient(135deg, var(--accent-soft) 0%, var(--accent) 100%);
+}
+
+@keyframes recorder-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 28%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 18px color-mix(in oklab, var(--accent) 0%, transparent);
+  }
+}
+
+.recorder-glow {
+  animation: recorder-glow 2.4s ease-in-out infinite;
+}
+
+.waveform-bar {
+  transition: height 80ms ease-out, opacity 80ms ease-out, background 80ms ease-out;
+}
