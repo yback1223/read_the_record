@@ -406,7 +406,7 @@ export default function BookView({
             </button>
           ))}
         </div>
-        <p className="tab-fade px-1 text-center text-[12px] italic leading-relaxed text-[color:var(--ink-muted)]" key={tab}>
+        <p className="px-1 text-center text-[12px] italic leading-relaxed text-[color:var(--ink-muted)]">
           {tab === "underlines"
             ? "마음에 닿은 문장을 목소리로 스쳐 적어두는 곳"
             : tab === "whispers"
@@ -415,8 +415,9 @@ export default function BookView({
         </p>
       </div>
 
+      <div key={tab} className="tab-fade flex flex-col gap-10">
       {(tab === "underlines" || tab === "whispers") && (
-      <section key={tab} className="tab-fade recorder-card relative flex flex-col items-center gap-6 overflow-hidden rounded-[18px] px-6 py-10">
+      <section className="recorder-card relative flex flex-col items-center gap-6 overflow-hidden rounded-[18px] px-6 py-10">
         {/* warm gradient background */}
         <div className="pointer-events-none absolute inset-0 -z-10" style={{
           background: isRecording
@@ -576,13 +577,11 @@ export default function BookView({
       )}
 
       {tab === "reflection" && (
-        <div className="tab-fade">
-          <ReflectionEditor
-            bookId={book.id}
-            initial={book.reflection ?? ""}
-            recordings={book.recordings}
-          />
-        </div>
+        <ReflectionEditor
+          bookId={book.id}
+          initial={book.reflection ?? ""}
+          recordings={book.recordings}
+        />
       )}
 
       {error && (
@@ -603,7 +602,7 @@ export default function BookView({
         const label = tab === "underlines" ? "밑줄" : "속삭임";
         const emptyMsg = tab === "underlines" ? "아직 남긴 문장이 없어요." : "아직 남긴 속삭임이 없어요.";
         return (
-      <section key={tab} className="tab-fade flex flex-col gap-5">
+      <section className="flex flex-col gap-5">
         <div className="flex items-center gap-3">
           <h2 className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
             {label}
@@ -647,6 +646,7 @@ export default function BookView({
       </section>
         );
       })()}
+      </div>
     </div>
   );
 }
