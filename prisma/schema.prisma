@@ -60,15 +60,21 @@ model Book {
   @@index([userId, createdAt])
 }
 
+enum RecordingType {
+  underline
+  whisper
+}
+
 model Recording {
-  id         String   @id @default(cuid())
+  id         String        @id @default(cuid())
   bookId     String
-  book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  book       Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
   audioPath  String
   mimeType   String
   transcript String
+  type       RecordingType @default(underline)
   page       Int?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime      @default(now())
 
   @@index([bookId])
 }

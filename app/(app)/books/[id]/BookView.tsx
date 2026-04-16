@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import BookshelfLoader from "@/components/BookshelfLoader";
 import ReflectionEditor from "./ReflectionEditor";
 
+type RecordingType = "underline" | "whisper";
+
 type Recording = {
   id: string;
   audioPath: string;
   mimeType: string;
   transcript: string;
+  type: RecordingType;
   page: number | null;
   createdAt: string;
 };
@@ -43,7 +46,7 @@ export default function BookView({
 
   const [pageEditId, setPageEditId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [tab, setTab] = useState<"recordings" | "reflection">("recordings");
+  const [tab, setTab] = useState<"underlines" | "whispers" | "reflection">("underlines");
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -153,6 +156,7 @@ export default function BookView({
     const form = new FormData();
     form.append("file", file);
     form.append("language", language);
+    form.append("type", tab === "whispers" ? "whisper" : "underline");
     try {
       const res = await fetch(`/api/books/${bookId}/recordings`, {
         method: "POST",
@@ -301,37 +305,35 @@ export default function BookView({
 
       <div className="flex flex-col gap-3">
         <div className="flex items-center rounded-full border hairline bg-[color:var(--paper-2)] p-1">
-          <button
-            type="button"
-            onClick={() => setTab("recordings")}
-            className={`flex-1 rounded-full py-2 text-[12px] tracking-wide ${
-              tab === "recordings"
-                ? "bg-[color:var(--ink)] text-[color:var(--paper)]"
-                : "text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
-            }`}
-          >
-            속삭임 · {book.recordings.length}
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("reflection")}
-            className={`flex-1 rounded-full py-2 text-[12px] tracking-wide ${
-              tab === "reflection"
-                ? "bg-[color:var(--ink)] text-[color:var(--paper)]"
-                : "text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
-            }`}
-          >
-            여운
-          </button>
+          {([
+            { key: "underlines" as const, label: "밑줄", count: book.recordings.filter(r => r.type === "underline").length },
+            { key: "whispers" as const, label: "속삭임", count: book.recordings.filter(r => r.type === "whisper").length },
+            { key: "reflection" as const, label: "독후감" },
+          ] as const).map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTab(t.key)}
+              className={`flex-1 rounded-full py-2 text-[12px] tracking-wide ${
+                tab === t.key
+                  ? "bg-[color:var(--ink)] text-[color:var(--paper)]"
+                  : "text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
+              }`}
+            >
+              {t.label}{"count" in t ? ` · ${t.count}` : ""}
+            </button>
+          ))}
         </div>
         <p className="px-1 text-center text-[12px] italic leading-relaxed text-[color:var(--ink-muted)]">
-          {tab === "recordings"
+          {tab === "underlines"
             ? "마음에 닿은 문장을 목소리로 스쳐 적어두는 곳"
-            : "책을 덮고 난 뒤에도 마음에 남는 생각을 길게 풀어두는 곳"}
+            : tab === "whispers"
+              ? "책을 읽다가 떠오른 생각을 목소리로 남기는 곳"
+              : "읽고 난 뒤 밑줄과 속삭임을 모아 긴 글로 풀어두는 곳"}
         </p>
       </div>
 
-      {tab === "recordings" && (
+      {(tab === "underlines" || tab === "whispers") && (
       <section className="paper-card relative flex flex-col items-center gap-5 px-6 py-8">
         {busy && (
           <div className="fade-up absolute inset-0 z-10 flex items-center justify-center rounded-[14px] bg-[color:var(--paper-2)]/92 backdrop-blur-sm">
@@ -436,26 +438,31 @@ export default function BookView({
         </div>
       )}
 
-      {tab === "recordings" && (
+      {(tab === "underlines" || tab === "whispers") && (() => {
+        const currentType: RecordingType = tab === "underlines" ? "underline" : "whisper";
+        const filtered = book.recordings.filter((r) => r.type === currentType);
+        const label = tab === "underlines" ? "밑줄" : "속삭임";
+        const emptyMsg = tab === "underlines" ? "아직 남긴 문장이 없어요." : "아직 남긴 속삭임이 없어요.";
+        return (
       <section className="flex flex-col gap-5">
         <div className="flex items-center gap-3">
           <h2 className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
-            속삭임
+            {label}
           </h2>
           <div className="h-px flex-1 bg-[color:var(--rule)]" />
           <span className="text-[11px] text-[color:var(--ink-soft)]">
-            {book.recordings.length}
+            {filtered.length}
           </span>
         </div>
 
-        {book.recordings.length === 0 && (
+        {filtered.length === 0 && (
           <p className="py-4 text-center text-sm italic text-[color:var(--ink-soft)]">
-            아직 남긴 문장이 없어요.
+            {emptyMsg}
           </p>
         )}
 
         <ul className="flex flex-col gap-5">
-          {book.recordings.map((r) => (
+          {filtered.map((r) => (
             <RecordingCard
               key={r.id}
               recording={r}
@@ -479,7 +486,8 @@ export default function BookView({
           ))}
         </ul>
       </section>
-      )}
+        );
+      })()}
     </div>
   );
 }

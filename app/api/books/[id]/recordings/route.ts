@@ -33,6 +33,8 @@ export async function POST(
     const form = await req.formData();
     const file = form.get("file");
     const language = (form.get("language") as string | null) ?? "ko";
+    const rawType = (form.get("type") as string | null) ?? "underline";
+    const recordingType = rawType === "whisper" ? "whisper" : "underline";
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "file required" }, { status: 400 });
     }
@@ -64,6 +66,7 @@ export async function POST(
         audioPath: "pending",
         mimeType: mime,
         transcript,
+        type: recordingType,
       },
     });
 

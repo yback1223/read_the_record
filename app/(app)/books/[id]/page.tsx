@@ -28,6 +28,7 @@ export default async function BookPage({
           audioPath: true,
           mimeType: true,
           transcript: true,
+          type: true,
           page: true,
           createdAt: true,
         },

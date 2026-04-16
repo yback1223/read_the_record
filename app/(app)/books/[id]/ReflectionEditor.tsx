@@ -11,6 +11,7 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 type RecordingRef = {
   id: string;
   transcript: string;
+  type: "underline" | "whisper";
   page: number | null;
   createdAt: string;
 };
@@ -34,6 +35,7 @@ export default function ReflectionEditor({
   // slash menu state
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashQuery, setSlashQuery] = useState("");
+  const [slashCommand, setSlashCommand] = useState<"밑줄" | "속삭임" | null>(null);
   const [slashPos, setSlashPos] = useState<{ top: number; left: number }>({
     top: 0,
     left: 0,
@@ -80,7 +82,7 @@ export default function ReflectionEditor({
       }),
       Placeholder.configure({
         placeholder:
-          "이 책을 읽으며 떠오른 생각을 적어보세요. /를 누르면 녹음을 불러올 수 있어요.",
+          "이 책을 읽으며 떠오른 생각을 적어보세요. /밑줄, /속삭임으로 불러올 수 있어요.",
         emptyEditorClass: "is-editor-empty",
       }),
     ],
@@ -125,12 +127,15 @@ export default function ReflectionEditor({
   function detectSlash(ed: Editor) {
     const { from } = ed.state.selection;
     const text = ed.state.doc.textBetween(Math.max(0, from - 30), from, "\n");
-    const match = text.match(/(?:^|\s)(\/([^\/\n\s]*))$/);
+    // Match /밑줄 or /속삭임 optionally followed by a search query
+    const match = text.match(/(?:^|\s)(\/(밑줄|속삭임)(\s+[^\n]*)?)$/);
     if (match) {
       const matched = match[1];
-      const query = match[2];
+      const cmd = match[2] as "밑줄" | "속삭임";
+      const query = (match[3] ?? "").trim();
       const start = from - matched.length;
       slashAnchorRef.current = { from: start, to: from };
+      setSlashCommand(cmd);
       setSlashQuery(query);
       setSlashIdx(0);
 
@@ -148,12 +153,40 @@ export default function ReflectionEditor({
       }
       setSlashOpen(true);
     } else {
-      setSlashOpen(false);
-      slashAnchorRef.current = null;
+      // Also detect bare "/" to show command hints
+      const bareMatch = text.match(/(?:^|\s)(\/(밑?|속?)?)$/);
+      if (bareMatch) {
+        const matched = bareMatch[1];
+        const start = from - matched.length;
+        slashAnchorRef.current = { from: start, to: from };
+        setSlashCommand(null);
+        setSlashQuery("");
+        setSlashIdx(0);
+
+        try {
+          const coords = ed.view.coordsAtPos(from);
+          const containerRect =
+            (ed.options.element as HTMLElement).getBoundingClientRect();
+          setSlashPos({
+            top: coords.bottom - containerRect.top + 4,
+            left: coords.left - containerRect.left,
+          });
+        } catch {
+          // ignore
+        }
+        setSlashOpen(true);
+      } else {
+        setSlashOpen(false);
+        slashAnchorRef.current = null;
+        setSlashCommand(null);
+      }
     }
   }
 
   const filteredRecordings = recordings.filter((r) => {
+    if (!slashCommand) return false;
+    const targetType = slashCommand === "밑줄" ? "underline" : "whisper";
+    if (r.type !== targetType) return false;
     if (!slashQuery) return true;
     const q = slashQuery.toLowerCase();
     return (
@@ -183,6 +216,23 @@ export default function ReflectionEditor({
     slashAnchorRef.current = null;
   }
 
+  function insertSlashCommand(cmd: "밑줄" | "속삭임") {
+    if (!editor || !slashAnchorRef.current) return;
+    const { from, to } = slashAnchorRef.current;
+    editor
+      .chain()
+      .focus()
+      .deleteRange({ from, to })
+      .insertContent(`/${cmd}`)
+      .run();
+  }
+
+  const slashMenuItems = slashCommand ? filteredRecordings : [];
+  const commandHints = [
+    { cmd: "밑줄" as const, desc: "밑줄 불러오기" },
+    { cmd: "속삭임" as const, desc: "속삭임 불러오기" },
+  ];
+
   function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     // Cmd/Ctrl+S manual save
     if ((e.metaKey || e.ctrlKey) && e.key === "s") {
@@ -190,18 +240,44 @@ export default function ReflectionEditor({
       manualSave();
       return;
     }
-    if (!slashOpen || filteredRecordings.length === 0) return;
+    if (!slashOpen) return;
+
+    // When showing command hints (no command selected yet)
+    if (!slashCommand) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSlashIdx((i) => (i + 1) % commandHints.length);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSlashIdx((i) => (i - 1 + commandHints.length) % commandHints.length);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        insertSlashCommand(commandHints[slashIdx].cmd);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        setSlashOpen(false);
+      }
+      return;
+    }
+
+    if (slashMenuItems.length === 0) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setSlashOpen(false);
+      }
+      return;
+    }
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSlashIdx((i) => (i + 1) % filteredRecordings.length);
+      setSlashIdx((i) => (i + 1) % slashMenuItems.length);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSlashIdx(
-        (i) => (i - 1 + filteredRecordings.length) % filteredRecordings.length,
+        (i) => (i - 1 + slashMenuItems.length) % slashMenuItems.length,
       );
     } else if (e.key === "Enter") {
       e.preventDefault();
-      insertRecording(filteredRecordings[slashIdx]);
+      insertRecording(slashMenuItems[slashIdx]);
     } else if (e.key === "Escape") {
       e.preventDefault();
       setSlashOpen(false);
@@ -222,7 +298,7 @@ export default function ReflectionEditor({
     <section className="paper-card relative flex flex-col gap-3 px-6 py-6">
       <div className="flex items-center gap-3">
         <h2 className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
-          여운
+          독후감
         </h2>
         <div className="h-px flex-1 bg-[color:var(--rule)]" />
         <SaveBadge state={state} error={errorMsg} dirty={dirty} />
@@ -238,41 +314,73 @@ export default function ReflectionEditor({
             className="absolute z-30 flex w-72 flex-col overflow-hidden rounded-lg border hairline bg-[color:var(--paper-2)] shadow-[0_18px_40px_-20px_rgba(70,50,20,0.35)]"
             style={{ top: slashPos.top, left: slashPos.left }}
           >
-            <div className="border-b hairline px-3 py-2 text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)]">
-              녹음 불러오기{slashQuery && ` · "${slashQuery}"`}
-            </div>
-            {filteredRecordings.length === 0 ? (
-              <div className="px-3 py-3 text-[12px] italic text-[color:var(--ink-soft)]">
-                결과가 없어요
-              </div>
+            {!slashCommand ? (
+              <>
+                <div className="border-b hairline px-3 py-2 text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)]">
+                  불러오기
+                </div>
+                <ul>
+                  {commandHints.map((h, idx) => (
+                    <li key={h.cmd}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          insertSlashCommand(h.cmd);
+                        }}
+                        onMouseEnter={() => setSlashIdx(idx)}
+                        className={`flex w-full items-center gap-2 px-3 py-2.5 text-left ${
+                          idx === slashIdx
+                            ? "bg-[color:var(--paper)]"
+                            : "hover:bg-[color:var(--paper)]"
+                        }`}
+                      >
+                        <span className="text-[12px] font-medium text-[color:var(--ink)]">/{h.cmd}</span>
+                        <span className="text-[11px] text-[color:var(--ink-soft)]">{h.desc}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
             ) : (
-              <ul className="max-h-64 overflow-y-auto">
-                {filteredRecordings.map((r, idx) => (
-                  <li key={r.id}>
-                    <button
-                      type="button"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        insertRecording(r);
-                      }}
-                      onMouseEnter={() => setSlashIdx(idx)}
-                      className={`flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left ${
-                        idx === slashIdx
-                          ? "bg-[color:var(--paper)]"
-                          : "hover:bg-[color:var(--paper)]"
-                      }`}
-                    >
-                      <span className="text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)]">
-                        {new Date(r.createdAt).toLocaleDateString("ko-KR")}
-                        {r.page != null ? ` · p. ${r.page}` : ""}
-                      </span>
-                      <span className="line-clamp-2 text-[12px] text-[color:var(--ink)]">
-                        {r.transcript || "(비어 있음)"}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <div className="border-b hairline px-3 py-2 text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)]">
+                  {slashCommand === "밑줄" ? "밑줄 불러오기" : "속삭임 불러오기"}{slashQuery && ` · "${slashQuery}"`}
+                </div>
+                {slashMenuItems.length === 0 ? (
+                  <div className="px-3 py-3 text-[12px] italic text-[color:var(--ink-soft)]">
+                    결과가 없어요
+                  </div>
+                ) : (
+                  <ul className="max-h-64 overflow-y-auto">
+                    {slashMenuItems.map((r, idx) => (
+                      <li key={r.id}>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            insertRecording(r);
+                          }}
+                          onMouseEnter={() => setSlashIdx(idx)}
+                          className={`flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left ${
+                            idx === slashIdx
+                              ? "bg-[color:var(--paper)]"
+                              : "hover:bg-[color:var(--paper)]"
+                          }`}
+                        >
+                          <span className="text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)]">
+                            {new Date(r.createdAt).toLocaleDateString("ko-KR")}
+                            {r.page != null ? ` · p. ${r.page}` : ""}
+                          </span>
+                          <span className="line-clamp-2 text-[12px] text-[color:var(--ink)]">
+                            {r.transcript || "(비어 있음)"}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
           </div>
         )}
@@ -284,7 +392,7 @@ export default function ReflectionEditor({
         </span>
         <div className="flex items-center gap-3">
           <span className="italic normal-case tracking-normal">
-            / 녹음 불러오기 · ⌘S 저장
+            /밑줄 · /속삭임 불러오기 · ⌘S / Ctrl+S 저장
           </span>
           <button
             type="button"
