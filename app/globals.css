@@ -247,3 +247,12 @@ button:focus-visible {
 .composer-textarea {
   field-sizing: content;
 }
+
+.composer-layer {
+  transition: opacity 280ms cubic-bezier(0.22, 1, 0.36, 1),
+              transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.composer-glow {
+  transition: opacity 400ms ease;
+}
