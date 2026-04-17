@@ -495,153 +495,153 @@ export default function BookView({
           </div>
         )}
 
-        {/* Both states always rendered, crossfade via CSS */}
-        <div className="relative">
-          {/* ── Recording layer ── */}
-          <div
-            className="composer-layer"
-            style={{
-              opacity: isRecording ? 1 : 0,
-              transform: isRecording ? "translateY(0)" : "translateY(6px)",
-              pointerEvents: isRecording ? "auto" : "none",
-              position: isRecording ? "relative" : "absolute",
-              inset: isRecording ? undefined : 0,
-            }}
-          >
-            <div className="flex flex-col gap-2 px-4 py-4">
-              <div className="flex items-center gap-3">
-                <div
-                  className="shrink-0 whitespace-nowrap text-[13px] text-[color:var(--accent)]"
-                  style={{
-                    fontFamily:
-                      "'SF Mono', ui-monospace, 'Menlo', 'Consolas', monospace",
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  {formatElapsed(elapsed)}
-                  <span className="text-[10px] text-[color:var(--ink-soft)]">
-                    {" "}
-                    / {formatElapsed(MAX_RECORDING_SECONDS)}
-                  </span>
-                </div>
-
-                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                  <div className="flex h-10 items-end gap-[2px]">
-                    {waveform.map((v, i) => (
-                      <div
-                        key={i}
-                        className="waveform-bar flex-1 rounded-full"
-                        style={{
-                          height: Math.max(2, v * 36),
-                          opacity: 0.3 + v * 0.7,
-                          background: `color-mix(in oklab, var(--accent) ${Math.round(50 + v * 50)}%, var(--accent-soft))`,
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <div className="h-[2px] w-full overflow-hidden rounded-full bg-[color:var(--rule)]">
-                    <div className="waveform-bar h-full rounded-full" style={{ width: `${Math.min(100, (elapsed / MAX_RECORDING_SECONDS) * 100)}%`, background: "var(--accent)" }} />
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={stopRecording}
-                  disabled={busy}
-                  aria-label="녹음 정지"
-                  className="composer-layer flex h-10 w-10 shrink-0 items-center justify-center rounded-full disabled:opacity-50"
-                  style={{
-                    background: "linear-gradient(135deg, var(--accent-soft) 0%, var(--accent) 100%)",
-                    boxShadow: "0 4px 20px -4px color-mix(in oklab, var(--accent) 40%, transparent)",
-                  }}
-                >
-                  <span className="recorder-glow absolute inset-0 rounded-full" />
-                  <span className="relative z-10 block rounded-[3px]" style={{ width: 10, height: 10, background: "var(--paper)" }} />
-                </button>
-              </div>
-              <p className="text-center text-[11px] italic text-[color:var(--ink-muted)]">
-                듣고 있어요… 다시 누르면 멈춰요
-              </p>
-            </div>
-          </div>
-
-          {/* ── Idle layer ── */}
-          <div
-            className="composer-layer"
-            style={{
-              opacity: isRecording ? 0 : 1,
-              transform: isRecording ? "translateY(-6px)" : "translateY(0)",
-              pointerEvents: isRecording ? "none" : "auto",
-              position: isRecording ? "absolute" : "relative",
-              inset: isRecording ? 0 : undefined,
-            }}
-          >
-            <div className="flex items-center gap-2 px-4 py-4">
-              <textarea
-                ref={textRef}
-                value={textDraft}
-                onChange={(e) => setTextDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                    e.preventDefault();
-                    submitText();
-                  }
+        {/* Only one UI rendered at a time — no layer overlap, no iOS hit-test ambiguity */}
+        {isRecording ? (
+          <div className="flex flex-col gap-2 px-4 py-4">
+            <div className="flex items-center gap-3">
+              <div
+                className="shrink-0 whitespace-nowrap text-[13px] text-[color:var(--accent)]"
+                style={{
+                  fontFamily:
+                    "'SF Mono', ui-monospace, 'Menlo', 'Consolas', monospace",
+                  fontVariantNumeric: "tabular-nums",
                 }}
-                placeholder={tab === "underlines" ? "속삭임을 적거나 녹음하세요" : "여운을 적거나 녹음하세요"}
-                rows={1}
-                disabled={isRecording}
-                className="composer-textarea prose-reading min-h-[2.6rem] max-h-32 flex-1 resize-none rounded-2xl border hairline bg-[color:var(--paper)]/60 px-4 py-2.5 text-[13px] leading-relaxed placeholder:italic placeholder:text-[color:var(--ink-soft)] focus:border-[color:var(--accent)] backdrop-blur-sm"
-              />
-
-              {/* action button: crossfade between send & mic */}
-              <div className="relative h-10 w-10 shrink-0">
-                {/* send button */}
-                <button
-                  type="button"
-                  onClick={submitText}
-                  disabled={textSaving || !textDraft.trim()}
-                  aria-label="남기기"
-                  className="composer-layer absolute inset-0 flex items-center justify-center rounded-full text-[color:var(--paper)] disabled:opacity-50"
-                  style={{
-                    background: "var(--accent)",
-                    opacity: textDraft.trim() ? 1 : 0,
-                    transform: textDraft.trim() ? "scale(1)" : "scale(0.7)",
-                    pointerEvents: textDraft.trim() ? "auto" : "none",
-                  }}
-                >
-                  {textSaving ? (
-                    <span className="block h-3 w-3 animate-spin rounded-full border-2 border-[color:var(--paper)] border-t-transparent" />
-                  ) : (
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M14 2 L2 8.5 L6.5 10 L14 2Z" />
-                      <path d="M6.5 10 L8 14.5 L14 2" />
-                    </svg>
-                  )}
-                </button>
-                {/* mic button */}
-                <button
-                  type="button"
-                  onClick={startRecording}
-                  disabled={busy}
-                  aria-label="녹음 시작"
-                  className="composer-layer absolute inset-0 flex items-center justify-center rounded-full disabled:opacity-50"
-                  style={{
-                    background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-soft) 100%)",
-                    boxShadow: "0 4px 20px -4px color-mix(in oklab, var(--accent) 40%, transparent)",
-                    opacity: textDraft.trim() ? 0 : 1,
-                    transform: textDraft.trim() ? "scale(0.7)" : "scale(1)",
-                    pointerEvents: textDraft.trim() ? "none" : "auto",
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--paper)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="5.5" y="1.5" width="5" height="8" rx="2.5" />
-                    <path d="M3.5 7a4.5 4.5 0 0 0 9 0M8 12.5v2" />
-                  </svg>
-                </button>
+              >
+                {formatElapsed(elapsed)}
+                <span className="text-[10px] text-[color:var(--ink-soft)]">
+                  {" "}
+                  / {formatElapsed(MAX_RECORDING_SECONDS)}
+                </span>
               </div>
+
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <div className="flex h-10 items-end gap-[2px]">
+                  {waveform.map((v, i) => (
+                    <div
+                      key={i}
+                      className="waveform-bar flex-1 rounded-full"
+                      style={{
+                        height: Math.max(2, v * 36),
+                        opacity: 0.3 + v * 0.7,
+                        background: `color-mix(in oklab, var(--accent) ${Math.round(50 + v * 50)}%, var(--accent-soft))`,
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="h-[2px] w-full overflow-hidden rounded-full bg-[color:var(--rule)]">
+                  <div
+                    className="waveform-bar h-full rounded-full"
+                    style={{
+                      width: `${Math.min(100, (elapsed / MAX_RECORDING_SECONDS) * 100)}%`,
+                      background: "var(--accent)",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={stopRecording}
+                disabled={busy}
+                aria-label="녹음 정지"
+                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full disabled:opacity-50"
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--accent-soft) 0%, var(--accent) 100%)",
+                  boxShadow:
+                    "0 4px 20px -4px color-mix(in oklab, var(--accent) 40%, transparent)",
+                }}
+              >
+                <span className="recorder-glow pointer-events-none absolute inset-0 rounded-full" />
+                <span
+                  className="relative z-10 block rounded-[3px]"
+                  style={{ width: 10, height: 10, background: "var(--paper)" }}
+                />
+              </button>
             </div>
+            <p className="text-center text-[11px] italic text-[color:var(--ink-muted)]">
+              듣고 있어요… 다시 누르면 멈춰요
+            </p>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-center gap-2 px-4 py-4">
+            <textarea
+              ref={textRef}
+              value={textDraft}
+              onChange={(e) => setTextDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  submitText();
+                }
+              }}
+              placeholder={
+                tab === "underlines"
+                  ? "속삭임을 적거나 녹음하세요"
+                  : "여운을 적거나 녹음하세요"
+              }
+              rows={1}
+              className="composer-textarea prose-reading min-h-[2.6rem] max-h-32 flex-1 resize-none rounded-2xl border hairline bg-[color:var(--paper)]/60 px-4 py-2.5 text-[13px] leading-relaxed placeholder:italic placeholder:text-[color:var(--ink-soft)] focus:border-[color:var(--accent)] backdrop-blur-sm"
+            />
+
+            {textDraft.trim() ? (
+              <button
+                type="button"
+                onClick={submitText}
+                disabled={textSaving}
+                aria-label="남기기"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[color:var(--paper)] disabled:opacity-50"
+                style={{ background: "var(--accent)" }}
+              >
+                {textSaving ? (
+                  <span className="block h-3 w-3 animate-spin rounded-full border-2 border-[color:var(--paper)] border-t-transparent" />
+                ) : (
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M14 2 L2 8.5 L6.5 10 L14 2Z" />
+                    <path d="M6.5 10 L8 14.5 L14 2" />
+                  </svg>
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={startRecording}
+                disabled={busy}
+                aria-label="녹음 시작"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full disabled:opacity-50"
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--accent) 0%, var(--accent-soft) 100%)",
+                  boxShadow:
+                    "0 4px 20px -4px color-mix(in oklab, var(--accent) 40%, transparent)",
+                }}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="var(--paper)"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="5.5" y="1.5" width="5" height="8" rx="2.5" />
+                  <path d="M3.5 7a4.5 4.5 0 0 0 9 0M8 12.5v2" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
       </section>
       )}
 
