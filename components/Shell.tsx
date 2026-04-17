@@ -104,23 +104,29 @@ export default function Shell({
   return (
     <div className="flex min-h-dvh">
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r hairline bg-[color:var(--paper-2)] ${
+        className={`fixed inset-y-0 left-0 z-40 w-[280px] border-r hairline bg-[color:var(--paper-2)] md:static md:!translate-x-0 md:!shadow-none ${
           open
             ? "translate-x-0 shadow-[24px_0_60px_-30px_rgba(70,50,20,0.45)]"
             : "-translate-x-full shadow-none"
-        } ${
-          collapsed
-            ? "md:!w-0 md:!-translate-x-full md:!border-r-0"
-            : "md:!w-[280px] md:!translate-x-0"
-        } md:static md:!shadow-none`}
+        } ${collapsed ? "md:!w-0 md:!border-r-0" : "md:!w-[280px]"}`}
         style={{
           willChange: "transform, width",
-          transitionProperty: "transform, box-shadow, width",
-          transitionDuration: "520ms",
-          transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+          transitionProperty: "transform, box-shadow, width, border-color",
+          transitionDuration: "420ms",
+          transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
           overflow: "hidden",
         }}
       >
+        <div
+          className="flex h-full w-[280px] flex-col"
+          style={{
+            opacity: collapsed ? 0 : 1,
+            transitionProperty: "opacity",
+            transitionDuration: "260ms",
+            transitionDelay: collapsed ? "0ms" : "160ms",
+            transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
+          }}
+        >
         <div className="flex h-20 items-center justify-between gap-2 pr-3">
           <Link
             href="/"
@@ -196,6 +202,7 @@ export default function Shell({
               <SignOutButton />
             </div>
           </div>
+        </div>
         </div>
       </aside>
 
