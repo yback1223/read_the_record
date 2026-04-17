@@ -104,13 +104,14 @@ button {
 button:not(:disabled),
 [role="button"]:not([aria-disabled="true"]),
 label:has(> input[type="file"]),
-a[href] {
-  cursor: pointer;
+a[href],
+summary {
+  cursor: pointer !important;
 }
 
 button:disabled,
 [role="button"][aria-disabled="true"] {
-  cursor: not-allowed;
+  cursor: not-allowed !important;
 }
 
 input:focus-visible,
