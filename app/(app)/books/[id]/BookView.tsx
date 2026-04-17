@@ -487,9 +487,19 @@ export default function BookView({
           >
             <div className="flex flex-col gap-2 px-4 py-4">
               <div className="flex items-center gap-3">
-                <div className="shrink-0 serif tabular-nums text-[14px] text-[color:var(--accent)]">
+                <div
+                  className="shrink-0 whitespace-nowrap text-[13px] text-[color:var(--accent)]"
+                  style={{
+                    fontFamily:
+                      "'SF Mono', ui-monospace, 'Menlo', 'Consolas', monospace",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
                   {formatElapsed(elapsed)}
-                  <span className="text-[10px] text-[color:var(--ink-soft)]"> / {formatElapsed(MAX_RECORDING_SECONDS)}</span>
+                  <span className="text-[10px] text-[color:var(--ink-soft)]">
+                    {" "}
+                    / {formatElapsed(MAX_RECORDING_SECONDS)}
+                  </span>
                 </div>
 
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -554,7 +564,7 @@ export default function BookView({
                     submitText();
                   }
                 }}
-                placeholder={tab === "underlines" ? "문장을 적거나, 녹음 버튼을 눌러 읽어보세요" : "생각을 적거나, 녹음 버튼을 눌러 말해보세요"}
+                placeholder={tab === "underlines" ? "속삭임을 적거나 녹음하세요" : "여운을 적거나 녹음하세요"}
                 rows={1}
                 disabled={isRecording}
                 className="composer-textarea prose-reading min-h-[2.6rem] max-h-32 flex-1 resize-none rounded-2xl border hairline bg-[color:var(--paper)]/60 px-4 py-2.5 text-[13px] leading-relaxed placeholder:italic placeholder:text-[color:var(--ink-soft)] focus:border-[color:var(--accent)] backdrop-blur-sm"
@@ -988,10 +998,31 @@ function AudioPlayer({ src }: { src: string }) {
         src={src}
         preload="metadata"
         onLoadedMetadata={() => {
-          if (audioRef.current) {
-            setDuration(audioRef.current.duration);
-            setLoaded(true);
+          const el = audioRef.current;
+          if (!el) return;
+          const d = el.duration;
+          // WebM from MediaRecorder reports Infinity/NaN — force the
+          // browser to scan the file by seeking to the end.
+          if (!isFinite(d) || isNaN(d) || d === 0) {
+            const onTimeUpdate = () => {
+              el.removeEventListener("timeupdate", onTimeUpdate);
+              const real = el.duration;
+              el.currentTime = 0;
+              if (isFinite(real) && real > 0) {
+                setDuration(real);
+                setLoaded(true);
+              }
+            };
+            el.addEventListener("timeupdate", onTimeUpdate);
+            try {
+              el.currentTime = 1e101;
+            } catch {
+              // ignore
+            }
+            return;
           }
+          setDuration(d);
+          setLoaded(true);
         }}
         onTimeUpdate={() => {
           if (audioRef.current) setCurrentTime(audioRef.current.currentTime);
