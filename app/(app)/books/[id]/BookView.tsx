@@ -133,6 +133,11 @@ export default function BookView({
 
   async function startRecording() {
     setError("");
+    // Defensively clear any leftover timer/recorder from a previous session
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -192,13 +197,31 @@ export default function BookView({
   }
 
   function stopRecording() {
-    mediaRecorderRef.current?.stop();
-    mediaRecorderRef.current = null;
-    setIsRecording(false);
+    // Stop the timer FIRST — independent of MediaRecorder state
     if (timerRef.current) {
       window.clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    setIsRecording(false);
+
+    // Then stop the recorder; onstop will flush and upload
+    try {
+      const rec = mediaRecorderRef.current;
+      if (rec && rec.state !== "inactive") {
+        rec.stop();
+      }
+    } catch {
+      // swallow — already stopped
+    }
+    mediaRecorderRef.current = null;
+
+    // Release mic immediately so the red indicator disappears on iOS
+    try {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    } catch {
+      // ignore
+    }
+    stopWaveformLoop();
   }
 
   async function uploadRecording(file: File) {
