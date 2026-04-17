@@ -82,7 +82,7 @@ export default function ReflectionEditor({
       }),
       Placeholder.configure({
         placeholder:
-          "이 책을 읽으며 떠오른 생각을 적어보세요. /밑줄, /속삭임으로 불러올 수 있어요.",
+          "책을 덮고 남은 생각을 천천히 적어보세요. / 를 누르면 속삭임을 불러올 수 있어요.",
         emptyEditorClass: "is-editor-empty",
       }),
     ],

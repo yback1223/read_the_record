@@ -577,8 +577,8 @@ export default function BookView({
               }}
               placeholder={
                 tab === "underlines"
-                  ? "속삭임을 적거나 녹음하세요"
-                  : "여운을 적거나 녹음하세요"
+                  ? "책 속 한 문장을 남겨보세요"
+                  : "책을 덮고 남은 생각을 적어보세요"
               }
               rows={1}
               className="composer-textarea prose-reading min-h-[2.6rem] max-h-32 flex-1 resize-none rounded-2xl border hairline bg-[color:var(--paper)]/60 px-4 py-2.5 text-[13px] leading-relaxed placeholder:italic placeholder:text-[color:var(--ink-soft)] focus:border-[color:var(--accent)] backdrop-blur-sm"

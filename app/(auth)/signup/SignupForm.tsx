@@ -79,7 +79,7 @@ export default function SignupForm() {
         autoComplete="nickname"
         value={nickname}
         onChange={setNickname}
-        placeholder="서비스에 표시될 이름"
+        placeholder="서재에서 불릴 이름"
       />
       <Field
         id="email"
