@@ -26,6 +26,7 @@ type Book = {
   coverUrl: string | null;
   publisher: string | null;
   reflection: string;
+  reflectionUpdatedAt: string | null;
   recordings: Recording[];
 };
 
@@ -651,9 +652,14 @@ export default function BookView({
         <ReflectionEditor
           bookId={book.id}
           initial={book.reflection ?? ""}
+          initialUpdatedAt={book.reflectionUpdatedAt}
           recordings={book.recordings}
-          onSaved={(html) =>
-            setBook((prev) => (prev ? { ...prev, reflection: html } : prev))
+          onSaved={(html, updatedAt) =>
+            setBook((prev) =>
+              prev
+                ? { ...prev, reflection: html, reflectionUpdatedAt: updatedAt }
+                : prev,
+            )
           }
         />
       )}

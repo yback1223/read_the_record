@@ -35,7 +35,7 @@ export const PATCH = withApiHandler(async (req: NextRequest, ctx) => {
   }
   const updated = await prisma.book.update({
     where: { id },
-    data: { reflection: body.reflection },
+    data: { reflection: body.reflection, reflectionUpdatedAt: new Date() },
   });
   return NextResponse.json(updated);
 });

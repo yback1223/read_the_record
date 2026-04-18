@@ -19,13 +19,15 @@ type RecordingRef = {
 export default function ReflectionEditor({
   bookId,
   initial,
+  initialUpdatedAt,
   recordings,
   onSaved,
 }: {
   bookId: string;
   initial: string;
+  initialUpdatedAt?: string | null;
   recordings: RecordingRef[];
-  onSaved?: (html: string) => void;
+  onSaved?: (html: string, updatedAt: string) => void;
 }) {
   const [state, setState] = useState<SaveState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -33,6 +35,9 @@ export default function ReflectionEditor({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef(false);
   const [dirty, setDirty] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(
+    initialUpdatedAt ?? null,
+  );
 
   // slash menu state
   const [slashOpen, setSlashOpen] = useState(false);
@@ -63,10 +68,16 @@ export default function ReflectionEditor({
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error ?? "저장 실패");
         }
+        const data = await res.json().catch(() => ({}));
+        const savedAt: string =
+          typeof data?.reflectionUpdatedAt === "string"
+            ? data.reflectionUpdatedAt
+            : new Date().toISOString();
         lastSavedRef.current = html;
         setDirty(false);
+        setUpdatedAt(savedAt);
         setState("saved");
-        onSaved?.(html);
+        onSaved?.(html, savedAt);
         setTimeout(() => {
           setState((s) => (s === "saved" ? "idle" : s));
         }, 1800);
@@ -433,6 +444,12 @@ export default function ReflectionEditor({
         </div>
       </div>
 
+      <p className="text-center text-[11px] italic text-[color:var(--ink-soft)]">
+        {updatedAt
+          ? `마지막 저장 · ${formatUpdatedAt(updatedAt)}`
+          : "아직 저장된 기록이 없어요."}
+      </p>
+
       <style>{`
         .tiptap-reflection {
           min-height: 12rem;
@@ -610,6 +627,22 @@ function SaveBadge({
     <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-[color:var(--accent)]">
       <Dot color="var(--accent)" /> 저장됨
     </span>
+  );
+}
+
+function formatUpdatedAt(iso: string) {
+  const d = new Date(iso);
+  return (
+    d.toLocaleDateString("ko-KR", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }) +
+    " · " +
+    d.toLocaleTimeString("ko-KR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
   );
 }
 

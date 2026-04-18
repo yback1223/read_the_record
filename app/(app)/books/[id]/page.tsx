@@ -21,6 +21,7 @@ export default async function BookPage({
       coverUrl: true,
       publisher: true,
       reflection: true,
+      reflectionUpdatedAt: true,
       recordings: {
         orderBy: { createdAt: "desc" },
         select: {
@@ -41,6 +42,7 @@ export default async function BookPage({
 
   const initial = {
     ...book,
+    reflectionUpdatedAt: book.reflectionUpdatedAt?.toISOString() ?? null,
     recordings: book.recordings.map((r) => ({
       ...r,
       createdAt: r.createdAt.toISOString(),

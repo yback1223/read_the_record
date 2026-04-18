@@ -46,16 +46,17 @@ model LoginEvent {
 }
 
 model Book {
-  id         String      @id @default(cuid())
-  userId     String
-  title      String
-  author     String?
-  isbn       String?
-  coverUrl   String?
-  publisher  String?
-  reflection String      @default("")
-  createdAt  DateTime    @default(now())
-  recordings Recording[]
+  id                  String      @id @default(cuid())
+  userId              String
+  title               String
+  author              String?
+  isbn                String?
+  coverUrl            String?
+  publisher           String?
+  reflection          String      @default("")
+  reflectionUpdatedAt DateTime?
+  createdAt           DateTime    @default(now())
+  recordings          Recording[]
 
   @@index([userId, createdAt])
 }
