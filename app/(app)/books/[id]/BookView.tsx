@@ -442,7 +442,7 @@ export default function BookView({
         <div className="h-px w-full bg-[color:var(--rule)]" />
       </header>
 
-      <div className="flex flex-col gap-3">
+      <div className="sticky top-14 z-10 -mx-6 flex flex-col gap-3 bg-[color:var(--paper)]/90 px-6 py-3 backdrop-blur md:top-0">
         <div ref={tabContainerRef} className="relative flex items-center rounded-full border hairline bg-[color:var(--paper-2)] p-1">
           {/* sliding indicator */}
           <div
