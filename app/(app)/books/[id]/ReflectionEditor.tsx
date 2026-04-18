@@ -42,6 +42,7 @@ export default function ReflectionEditor({
   });
   const [slashIdx, setSlashIdx] = useState(0);
   const slashAnchorRef = useRef<{ from: number; to: number } | null>(null);
+  const keyHandlerRef = useRef<(e: KeyboardEvent) => boolean>(() => false);
 
   const doSave = useCallback(
     async (html: string) => {
@@ -91,6 +92,9 @@ export default function ReflectionEditor({
     editorProps: {
       attributes: {
         class: "prose-reading tiptap-reflection focus:outline-none",
+      },
+      handleKeyDown(_view, event) {
+        return keyHandlerRef.current(event);
       },
     },
     onUpdate({ editor }) {
@@ -233,56 +237,65 @@ export default function ReflectionEditor({
     { cmd: "속삭임" as const, desc: "속삭임 불러오기" },
   ];
 
-  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+  keyHandlerRef.current = (e: KeyboardEvent) => {
     // Cmd/Ctrl+S manual save
     if ((e.metaKey || e.ctrlKey) && e.key === "s") {
       e.preventDefault();
       manualSave();
-      return;
+      return true;
     }
-    if (!slashOpen) return;
+    if (!slashOpen) return false;
+    // Don't interfere with Korean/IME composition
+    if (e.isComposing || e.keyCode === 229) return false;
 
     // When showing command hints (no command selected yet)
     if (!slashCommand) {
       if (e.key === "ArrowDown") {
-        e.preventDefault();
         setSlashIdx((i) => (i + 1) % commandHints.length);
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setSlashIdx((i) => (i - 1 + commandHints.length) % commandHints.length);
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        insertSlashCommand(commandHints[slashIdx].cmd);
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        setSlashOpen(false);
+        return true;
       }
-      return;
+      if (e.key === "ArrowUp") {
+        setSlashIdx((i) => (i - 1 + commandHints.length) % commandHints.length);
+        return true;
+      }
+      if (e.key === "Enter") {
+        insertSlashCommand(commandHints[slashIdx].cmd);
+        return true;
+      }
+      if (e.key === "Escape") {
+        setSlashOpen(false);
+        return true;
+      }
+      return false;
     }
 
     if (slashMenuItems.length === 0) {
       if (e.key === "Escape") {
-        e.preventDefault();
         setSlashOpen(false);
+        return true;
       }
-      return;
+      return false;
     }
     if (e.key === "ArrowDown") {
-      e.preventDefault();
       setSlashIdx((i) => (i + 1) % slashMenuItems.length);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
+      return true;
+    }
+    if (e.key === "ArrowUp") {
       setSlashIdx(
         (i) => (i - 1 + slashMenuItems.length) % slashMenuItems.length,
       );
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      insertRecording(slashMenuItems[slashIdx]);
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      setSlashOpen(false);
+      return true;
     }
-  }
+    if (e.key === "Enter") {
+      insertRecording(slashMenuItems[slashIdx]);
+      return true;
+    }
+    if (e.key === "Escape") {
+      setSlashOpen(false);
+      return true;
+    }
+    return false;
+  };
 
   function manualSave() {
     if (!editor) return;
@@ -306,7 +319,7 @@ export default function ReflectionEditor({
 
       {editor && <Toolbar editor={editor} />}
 
-      <div className="relative" onKeyDown={onKeyDown}>
+      <div className="relative">
         <EditorContent editor={editor} />
 
         {slashOpen && (
