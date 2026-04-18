@@ -652,6 +652,9 @@ export default function BookView({
           bookId={book.id}
           initial={book.reflection ?? ""}
           recordings={book.recordings}
+          onSaved={(html) =>
+            setBook((prev) => (prev ? { ...prev, reflection: html } : prev))
+          }
         />
       )}
 

@@ -20,10 +20,12 @@ export default function ReflectionEditor({
   bookId,
   initial,
   recordings,
+  onSaved,
 }: {
   bookId: string;
   initial: string;
   recordings: RecordingRef[];
+  onSaved?: (html: string) => void;
 }) {
   const [state, setState] = useState<SaveState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -43,6 +45,7 @@ export default function ReflectionEditor({
   const [slashIdx, setSlashIdx] = useState(0);
   const slashAnchorRef = useRef<{ from: number; to: number } | null>(null);
   const keyHandlerRef = useRef<(e: KeyboardEvent) => boolean>(() => false);
+  const flushRef = useRef<() => void>(() => {});
 
   const doSave = useCallback(
     async (html: string) => {
@@ -63,6 +66,7 @@ export default function ReflectionEditor({
         lastSavedRef.current = html;
         setDirty(false);
         setState("saved");
+        onSaved?.(html);
         setTimeout(() => {
           setState((s) => (s === "saved" ? "idle" : s));
         }, 1800);
@@ -73,7 +77,7 @@ export default function ReflectionEditor({
         inFlightRef.current = false;
       }
     },
-    [bookId],
+    [bookId, onSaved],
   );
 
   const editor = useEditor({
@@ -111,9 +115,19 @@ export default function ReflectionEditor({
     },
   });
 
+  flushRef.current = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (editor && dirty) {
+      doSave(editor.getHTML());
+    }
+  };
+
   useEffect(() => {
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      flushRef.current();
     };
   }, []);
 
