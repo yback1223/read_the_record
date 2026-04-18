@@ -72,6 +72,7 @@ model Recording {
   audioPath  String?
   mimeType   String?
   transcript String
+  memo       String?
   type       RecordingType @default(underline)
   page       Int?
   createdAt  DateTime      @default(now())

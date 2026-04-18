@@ -12,8 +12,11 @@ export const PATCH = withApiHandler(async (req: NextRequest, ctx) => {
   const { id } = await ctx.params;
   const body = await req.json();
 
-  const data: { transcript?: string; page?: number | null } = {};
+  const data: { transcript?: string; memo?: string | null; page?: number | null } = {};
   if (typeof body?.transcript === "string") data.transcript = body.transcript;
+  if ("memo" in body) {
+    data.memo = typeof body.memo === "string" && body.memo.trim() ? body.memo.trim() : null;
+  }
   if ("page" in body) {
     if (body.page == null || body.page === "") {
       data.page = null;

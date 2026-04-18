@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import BookshelfLoader from "@/components/BookshelfLoader";
 import ReflectionEditor from "./ReflectionEditor";
@@ -12,6 +13,7 @@ type Recording = {
   audioPath: string | null;
   mimeType: string | null;
   transcript: string;
+  memo: string | null;
   type: RecordingType;
   page: number | null;
   createdAt: string;
@@ -716,8 +718,8 @@ export default function BookView({
       })()}
       </div>
 
-      {/* page number modal */}
-      {pageEditId && (
+      {/* page number modal — portal to body to escape transform containment */}
+      {pageEditId && createPortal(
         <div className={`fixed inset-0 z-50 flex items-center justify-center ${pageModalClosing ? "modal-backdrop-out" : "modal-backdrop-in"}`}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closePageModal} />
           <div className={`relative z-10 mx-6 flex w-full max-w-xs flex-col items-center gap-5 rounded-2xl border hairline bg-[color:var(--paper-2)] px-8 py-8 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.4)] ${pageModalClosing ? "page-modal-out" : "page-modal"}`}>
@@ -757,7 +759,8 @@ export default function BookView({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -780,6 +783,11 @@ function RecordingCard({
   const [draft, setDraft] = useState(recording.transcript);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+
+  const [memoEditing, setMemoEditing] = useState(false);
+  const [memoDraft, setMemoDraft] = useState(recording.memo ?? "");
+  const [memoSaving, setMemoSaving] = useState(false);
+  const memoRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [pageEditing, setPageEditing] = useState(false);
   const [pageDraft, setPageDraft] = useState<string>(
@@ -839,6 +847,31 @@ function RecordingCard({
     onSaved(updated);
     setSavingPage(false);
     setPageEditing(false);
+  }
+
+  async function saveMemo() {
+    const value = memoDraft.trim();
+    if (value === (recording.memo ?? "")) {
+      setMemoEditing(false);
+      return;
+    }
+    setMemoSaving(true);
+    setErr("");
+    const res = await fetch(`/api/recordings/${recording.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memo: value || null }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setErr(data.error ?? "저장 실패");
+      setMemoSaving(false);
+      return;
+    }
+    const updated = (await res.json()) as Recording;
+    onSaved(updated);
+    setMemoSaving(false);
+    setMemoEditing(false);
   }
 
   function onPageKey(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -971,6 +1004,87 @@ function RecordingCard({
             </span>
           )}
         </blockquote>
+      )}
+
+      {/* memo */}
+      {memoEditing ? (
+        <div className="fade-up mt-4 flex flex-col gap-2">
+          <textarea
+            ref={memoRef}
+            value={memoDraft}
+            onChange={(e) => setMemoDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                saveMemo();
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setMemoDraft(recording.memo ?? "");
+                setMemoEditing(false);
+              }
+            }}
+            rows={2}
+            placeholder="이 문장이 마음에 남은 이유…"
+            className="prose-reading w-full resize-none rounded-xl border hairline bg-[color:var(--paper)] px-4 py-3 text-[13px] leading-relaxed text-[color:var(--ink)] placeholder:italic placeholder:text-[color:var(--ink-soft)] focus:border-[color:var(--accent)]"
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setMemoDraft(recording.memo ?? "");
+                setMemoEditing(false);
+              }}
+              disabled={memoSaving}
+              className="rounded-full border hairline px-3 py-1 text-[10px] uppercase tracking-wider text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={saveMemo}
+              disabled={memoSaving}
+              className="rounded-full px-3 py-1 text-[10px] uppercase tracking-wider text-[color:var(--paper)] disabled:opacity-50"
+              style={{ background: "var(--accent)" }}
+            >
+              {memoSaving ? "저장 중…" : "저장"}
+            </button>
+          </div>
+        </div>
+      ) : recording.memo ? (
+        <button
+          type="button"
+          onClick={() => {
+            setMemoDraft(recording.memo ?? "");
+            setMemoEditing(true);
+            requestAnimationFrame(() => memoRef.current?.focus());
+          }}
+          className="group mt-3 flex w-full items-start gap-2.5 rounded-xl px-4 py-3 text-left hover:bg-[color:var(--paper)]"
+          style={{ background: "color-mix(in oklab, var(--accent) 5%, transparent)" }}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="mt-0.5 shrink-0 text-[color:var(--accent)] opacity-50">
+            <path d="M13.5 8.5c0 3-2.5 5-5.5 5H5l-2.5 1.5.5-2.5C1.5 11 1 9.5 1 8c0-3.5 3-6 7-6s5.5 2.5 5.5 6.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span className="prose-reading text-[13px] leading-relaxed text-[color:var(--ink-muted)] group-hover:text-[color:var(--ink)]">
+            {recording.memo}
+          </span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            setMemoDraft("");
+            setMemoEditing(true);
+            requestAnimationFrame(() => memoRef.current?.focus());
+          }}
+          className="mt-3 flex items-center gap-1.5 self-start rounded-full px-3 py-1 text-[11px] tracking-wide text-[color:var(--ink-soft)] hover:text-[color:var(--accent)] hover:bg-[color:var(--paper)]"
+          style={{ transition: "color 160ms, background 160ms" }}
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className="opacity-60">
+            <path d="M13.5 8.5c0 3-2.5 5-5.5 5H5l-2.5 1.5.5-2.5C1.5 11 1 9.5 1 8c0-3.5 3-6 7-6s5.5 2.5 5.5 6.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          나의 한마디
+        </button>
       )}
 
       {recording.audioPath && (
