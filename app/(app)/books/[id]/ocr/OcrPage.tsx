@@ -373,8 +373,11 @@ export default function OcrPage({ bookId }: { bookId: string }) {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b hairline bg-[color:var(--paper)] px-5 py-3">
+    <div
+      className="fixed inset-0 z-[60] flex flex-col bg-[color:var(--paper)]"
+      style={{ height: "100dvh" }}
+    >
+      <header className="flex shrink-0 items-center justify-between border-b hairline bg-[color:var(--paper)] px-5 py-3">
         <button
           type="button"
           onClick={() => router.back()}
