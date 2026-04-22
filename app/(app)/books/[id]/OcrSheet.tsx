@@ -333,7 +333,7 @@ export default function OcrSheet({
 
   return (
     <div
-      className="fixed inset-0 z-[65] flex items-end justify-center md:items-center"
+      className="fixed inset-0 z-[65] flex items-stretch justify-center md:items-center"
       style={{
         background:
           "radial-gradient(120% 80% at 30% 30%, rgba(20,12,4,0.45), rgba(20,12,4,0.2))",
@@ -345,11 +345,9 @@ export default function OcrSheet({
       }}
     >
       <div
-        className="fade-up paper-card relative flex w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl md:rounded-3xl"
+        className="fade-up paper-card relative flex h-dvh w-full max-w-2xl flex-col overflow-hidden rounded-none md:h-auto md:max-h-[90dvh] md:rounded-3xl"
         style={{
           animation: "ocr-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both",
-          height: "min(90dvh, 760px)",
-          maxHeight: "90dvh",
         }}
       >
         <header className="flex items-center justify-between border-b hairline px-5 py-4">
