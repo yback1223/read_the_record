@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import BookshelfLoader from "@/components/BookshelfLoader";
 import ReflectionEditor from "./ReflectionEditor";
+import OcrSheet from "./OcrSheet";
 
 type RecordingType = "underline" | "whisper";
 
@@ -83,6 +84,11 @@ export default function BookView({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const rafRef = useRef<number | null>(null);
   const [waveform, setWaveform] = useState<number[]>(new Array(32).fill(0));
+
+  // OCR
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const [ocrFiles, setOcrFiles] = useState<File[]>([]);
+  const [ocrOpen, setOcrOpen] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/books/${bookId}`, { cache: "no-store" });
@@ -304,6 +310,37 @@ export default function BookView({
       requestAnimationFrame(() => pageModalRef.current?.focus());
     }
   }, [pageEditId]);
+
+  function onCameraPicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    setOcrFiles(files);
+    setOcrOpen(true);
+    e.target.value = "";
+  }
+
+  async function saveOcrSelection({
+    text,
+    page,
+  }: {
+    text: string;
+    page: number | null;
+  }) {
+    const res = await fetch(`/api/books/${bookId}/recordings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        transcript: text,
+        type: "underline",
+        page,
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error ?? "저장 실패");
+    }
+    await load();
+  }
 
   async function submitText() {
     const text = textDraft.trim();
@@ -587,6 +624,41 @@ export default function BookView({
               className="composer-textarea prose-reading min-h-[2.6rem] max-h-32 flex-1 resize-none rounded-2xl border hairline bg-[color:var(--paper)]/60 px-4 py-2.5 text-[13px] leading-relaxed placeholder:italic placeholder:text-[color:var(--ink-soft)] focus:border-[color:var(--accent)] backdrop-blur-sm"
             />
 
+            {tab === "underlines" && !textDraft.trim() && (
+              <>
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={onCameraPicked}
+                />
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  disabled={busy}
+                  aria-label="사진으로 담기"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border hairline text-[color:var(--ink-muted)] hover:text-[color:var(--accent)] hover:border-[color:var(--accent)] disabled:opacity-50"
+                  title="사진 속 문장 담기"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M2 5h2.5l1-1.5h5l1 1.5H14v8H2z" />
+                    <circle cx="8" cy="9" r="2.5" />
+                  </svg>
+                </button>
+              </>
+            )}
+
             {textDraft.trim() ? (
               <button
                 type="button"
@@ -771,6 +843,17 @@ export default function BookView({
         </div>,
         document.body,
       )}
+
+      <OcrSheet
+        open={ocrOpen}
+        bookId={bookId}
+        files={ocrFiles}
+        onClose={() => {
+          setOcrOpen(false);
+          setOcrFiles([]);
+        }}
+        onPicked={saveOcrSelection}
+      />
     </div>
   );
 }
