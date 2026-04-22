@@ -114,10 +114,19 @@ export default function OcrSheet({
     current: number;
     mode: "add" | "remove";
   } | null>(null);
-  const [mode, setMode] = useState<"read" | "select">("read");
   const [pageOverride, setPageOverride] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [pressingWord, setPressingWord] = useState<number | null>(null);
   const viewerRef = useRef<HTMLDivElement | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const pendingRef = useRef<{
+    pageIdx: number;
+    wordIdx: number;
+    x: number;
+    y: number;
+    pointerId: number;
+    pointerType: string;
+  } | null>(null);
 
   // Tokenize pages once per result set
   const tokensByPage = useMemo(() => {
@@ -200,32 +209,88 @@ export default function OcrSheet({
     setDragState({ pageIdx, start: wordIdx, current: wordIdx, mode });
   }
 
+  function activateDrag(pointerTarget: Element, pointerId: number) {
+    if (!pendingRef.current) return;
+    const { pageIdx, wordIdx } = pendingRef.current;
+    startDrag(pageIdx, wordIdx);
+    try {
+      pointerTarget.setPointerCapture?.(pointerId);
+    } catch {
+      // ignore
+    }
+    if (viewerRef.current) {
+      viewerRef.current.style.touchAction = "none";
+    }
+    if (navigator.vibrate) {
+      try {
+        navigator.vibrate(10);
+      } catch {
+        // ignore
+      }
+    }
+    setPressingWord(null);
+  }
+
+  function cancelPending() {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    pendingRef.current = null;
+    setPressingWord(null);
+  }
+
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (mode !== "select") return;
     if (state.kind !== "done") return;
     const pageIdx = activePage?.index;
     if (pageIdx == null) return;
     const idx = wordIdxFromPoint(e.clientX, e.clientY);
     if (idx == null) return;
-    try {
-      (e.target as Element).setPointerCapture?.(e.pointerId);
-    } catch {
-      // ignore
+
+    const target = e.target as Element;
+    const pointerId = e.pointerId;
+    pendingRef.current = {
+      pageIdx,
+      wordIdx: idx,
+      x: e.clientX,
+      y: e.clientY,
+      pointerId,
+      pointerType: e.pointerType,
+    };
+
+    if (e.pointerType === "mouse" || e.pointerType === "pen") {
+      // desktop: start immediately
+      activateDrag(target, pointerId);
+      return;
     }
-    e.preventDefault();
-    startDrag(pageIdx, idx);
+    // touch: long-press to enter drag mode. Otherwise browser handles scroll.
+    setPressingWord(idx);
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressTimerRef.current = null;
+      if (pendingRef.current) activateDrag(target, pointerId);
+    }, 300);
   }
 
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (!dragState) return;
-    const idx = wordIdxFromPoint(e.clientX, e.clientY);
-    if (idx != null && idx !== dragState.current) {
-      setDragState({ ...dragState, current: idx });
+    if (dragState) {
+      const idx = wordIdxFromPoint(e.clientX, e.clientY);
+      if (idx != null && idx !== dragState.current) {
+        setDragState({ ...dragState, current: idx });
+      }
+      e.preventDefault();
+      return;
     }
-    e.preventDefault();
+    // Not yet dragging — if pointer moved too much, cancel pending so scroll works naturally
+    const pending = pendingRef.current;
+    if (!pending) return;
+    const dx = e.clientX - pending.x;
+    const dy = e.clientY - pending.y;
+    if (Math.hypot(dx, dy) > 8) cancelPending();
   }
 
   function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    cancelPending();
+    if (viewerRef.current) viewerRef.current.style.touchAction = "";
     if (!dragState) return;
     try {
       (e.target as Element).releasePointerCapture?.(e.pointerId);
@@ -244,6 +309,12 @@ export default function OcrSheet({
       return { ...prev, [pageIdx]: cur };
     });
     setDragState(null);
+  }
+
+  function onPointerCancel(e: React.PointerEvent<HTMLDivElement>) {
+    cancelPending();
+    if (viewerRef.current) viewerRef.current.style.touchAction = "";
+    if (dragState) onPointerUp(e);
   }
 
   function clearCurrentPageSelection() {
@@ -352,52 +423,25 @@ export default function OcrSheet({
           maxHeight: "100dvh",
         }}
       >
-        <header className="flex items-center justify-between border-b hairline px-5 py-4">
+        <header className="flex shrink-0 items-center justify-between border-b hairline px-5 py-3">
           <div className="flex flex-col">
-            <span className="text-[11px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
+            <span className="text-[10px] uppercase tracking-[0.22em] text-[color:var(--ink-soft)]">
               사진에서 문장 담기
             </span>
-            <span className="serif text-[15px] text-[color:var(--ink)]">
+            <span className="serif text-[14px] text-[color:var(--ink)]">
               {state.kind !== "done"
                 ? "잠시만요"
-                : mode === "read"
-                  ? "내용을 쭉 읽어보세요"
-                  : "담을 부분을 드래그로 고르세요"}
+                : "꾹 누른 뒤 드래그해서 고르세요"}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            {state.kind === "done" && (
-              <button
-                type="button"
-                onClick={() =>
-                  setMode((m) => (m === "read" ? "select" : "read"))
-                }
-                className="rounded-full px-3 py-1.5 text-[11px] uppercase tracking-wider disabled:opacity-50"
-                style={
-                  mode === "select"
-                    ? {
-                        background: "var(--accent)",
-                        color: "var(--paper)",
-                      }
-                    : {
-                        background: "transparent",
-                        color: "var(--ink-muted)",
-                        border: "1px solid var(--rule)",
-                      }
-                }
-              >
-                {mode === "select" ? "고르기 완료" : "고르기 시작"}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="닫기"
-              className="flex h-8 w-8 items-center justify-center rounded-full border hairline text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
-            >
-              ✕
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="닫기"
+            className="flex h-8 w-8 items-center justify-center rounded-full border hairline text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
+          >
+            ✕
+          </button>
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
@@ -456,16 +500,16 @@ export default function OcrSheet({
 
               <div
                 ref={viewerRef}
-                onPointerDown={mode === "select" ? onPointerDown : undefined}
-                onPointerMove={mode === "select" ? onPointerMove : undefined}
-                onPointerUp={mode === "select" ? onPointerUp : undefined}
-                onPointerCancel={mode === "select" ? onPointerUp : undefined}
-                className="px-5 py-6"
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerCancel}
+                className="px-5 py-5"
                 style={{
                   WebkitUserSelect: "none",
                   userSelect: "none",
                   WebkitTouchCallout: "none",
-                  touchAction: mode === "select" ? "none" : "pan-y",
+                  touchAction: "pan-y",
                 }}
               >
                 {activePage?.error ? (
@@ -505,15 +549,16 @@ export default function OcrSheet({
                       );
                       const isStart = on && !prevOn;
                       const isEnd = on && !nextOn;
+                      const isPressing = pressingWord === tok.idx;
                       return (
                         <span
                           key={`w${tok.idx}`}
                           data-word-idx={tok.idx}
-                          className={`ocr-word ${
-                            mode === "select" ? "ocr-word--selectable" : ""
-                          } ${on ? "ocr-word--on" : ""} ${
-                            isStart ? "ocr-word--start" : ""
-                          } ${isEnd ? "ocr-word--end" : ""}`}
+                          className={`ocr-word ocr-word--selectable ${
+                            on ? "ocr-word--on" : ""
+                          } ${isStart ? "ocr-word--start" : ""} ${
+                            isEnd ? "ocr-word--end" : ""
+                          } ${isPressing ? "ocr-word--press" : ""}`}
                         >
                           {tok.text}
                         </span>
@@ -531,7 +576,7 @@ export default function OcrSheet({
         </div>
 
         {state.kind === "done" && (
-          <footer className="flex flex-col gap-3 border-t hairline bg-[color:var(--paper-2)] px-5 py-4">
+          <footer className="flex shrink-0 flex-col gap-2.5 border-t hairline bg-[color:var(--paper-2)] px-5 py-3">
             <div className="flex items-center gap-3">
               <span className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
                 담긴 문장
@@ -621,6 +666,14 @@ export default function OcrSheet({
           }
           .ocr-word--selectable {
             cursor: pointer;
+          }
+          .ocr-word--press {
+            background-color: color-mix(in oklab, var(--accent) 14%, transparent);
+            animation: word-press 300ms cubic-bezier(0.4, 0, 0.2, 1);
+          }
+          @keyframes word-press {
+            from { background-color: transparent; }
+            to { background-color: color-mix(in oklab, var(--accent) 14%, transparent); }
           }
           .ocr-word--on,
           .ocr-space--on {
