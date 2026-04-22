@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import BookshelfLoader from "@/components/BookshelfLoader";
 import ReflectionEditor from "./ReflectionEditor";
-import OcrSheet from "./OcrSheet";
+import { setOcrFiles } from "@/lib/ocr-store";
 
 type RecordingType = "underline" | "whisper";
 
@@ -89,8 +89,6 @@ export default function BookView({
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const [photoQueue, setPhotoQueue] = useState<File[]>([]);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
-  const [ocrFiles, setOcrFiles] = useState<File[]>([]);
-  const [ocrOpen, setOcrOpen] = useState(false);
 
   // Cleanup blob URLs on unmount or when queue changes
   useEffect(() => {
@@ -351,31 +349,12 @@ export default function BookView({
 
   function startOcr() {
     if (photoQueue.length === 0) return;
-    setOcrFiles(photoQueue);
-    setOcrOpen(true);
-  }
-
-  async function saveOcrSelection({
-    text,
-    page,
-  }: {
-    text: string;
-    page: number | null;
-  }) {
-    const res = await fetch(`/api/books/${bookId}/recordings`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        transcript: text,
-        type: "underline",
-        page,
-      }),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error ?? "저장 실패");
-    }
-    await load();
+    setOcrFiles(bookId, photoQueue);
+    // clear previews so stale files don't linger in memory
+    photoPreviews.forEach((u) => URL.revokeObjectURL(u));
+    setPhotoPreviews([]);
+    setPhotoQueue([]);
+    router.push(`/books/${bookId}/ocr`);
   }
 
   async function submitText() {
@@ -981,18 +960,6 @@ export default function BookView({
         </div>,
         document.body,
       )}
-
-      <OcrSheet
-        open={ocrOpen}
-        bookId={bookId}
-        files={ocrFiles}
-        onClose={() => {
-          setOcrOpen(false);
-          setOcrFiles([]);
-          clearPhotoQueue();
-        }}
-        onPicked={saveOcrSelection}
-      />
     </div>
   );
 }
