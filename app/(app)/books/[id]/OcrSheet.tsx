@@ -345,9 +345,11 @@ export default function OcrSheet({
       }}
     >
       <div
-        className="fade-up paper-card relative flex h-dvh w-full max-w-2xl flex-col overflow-hidden rounded-none md:h-auto md:max-h-[90dvh] md:rounded-3xl"
+        className="ocr-sheet fade-up paper-card relative flex w-full max-w-2xl flex-col overflow-hidden rounded-none"
         style={{
           animation: "ocr-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both",
+          height: "100dvh",
+          maxHeight: "100dvh",
         }}
       >
         <header className="flex items-center justify-between border-b hairline px-5 py-4">
@@ -602,6 +604,13 @@ export default function OcrSheet({
           @keyframes ocr-in {
             from { opacity: 0; transform: translateY(30px); }
             to { opacity: 1; transform: translateY(0); }
+          }
+          @media (min-width: 768px) {
+            .ocr-sheet {
+              height: auto !important;
+              max-height: 90dvh !important;
+              border-radius: 24px !important;
+            }
           }
           .ocr-word {
             display: inline;
