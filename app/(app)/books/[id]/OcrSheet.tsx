@@ -14,18 +14,38 @@ type PageResult = {
 
 type Token =
   | { kind: "word"; text: string; idx: number }
-  | { kind: "space"; text: string };
+  | {
+      kind: "space";
+      text: string;
+      prevWord: number | null;
+      nextWord: number | null;
+    };
 
 function tokenize(text: string): Token[] {
   if (!text) return [];
-  const parts = text.split(/(\s+|(?<=[.!?])\s*)/g).filter(Boolean);
+  const parts = text.split(/(\s+)/g).filter(Boolean);
   const out: Token[] = [];
   let nextIdx = 0;
+  let lastWord: number | null = null;
+  const pendingSpaces: number[] = [];
   for (const p of parts) {
-    if (/^\s*$/.test(p)) {
-      out.push({ kind: "space", text: p });
+    if (/^\s+$/.test(p)) {
+      out.push({
+        kind: "space",
+        text: p,
+        prevWord: lastWord,
+        nextWord: null,
+      });
+      pendingSpaces.push(out.length - 1);
     } else {
-      out.push({ kind: "word", text: p, idx: nextIdx++ });
+      const wordIdx = nextIdx++;
+      for (const sp of pendingSpaces) {
+        const s = out[sp];
+        if (s.kind === "space") s.nextWord = wordIdx;
+      }
+      pendingSpaces.length = 0;
+      out.push({ kind: "word", text: p, idx: wordIdx });
+      lastWord = wordIdx;
     }
   }
   return out;
@@ -319,9 +339,11 @@ export default function OcrSheet({
       }}
     >
       <div
-        className="fade-up paper-card relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl md:rounded-3xl"
+        className="fade-up paper-card relative flex w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl md:rounded-3xl"
         style={{
           animation: "ocr-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both",
+          height: "min(90dvh, 760px)",
+          maxHeight: "90dvh",
         }}
       >
         <header className="flex items-center justify-between border-b hairline px-5 py-4">
@@ -419,23 +441,46 @@ export default function OcrSheet({
                       fontFamily: "var(--font-serif-book), Georgia, serif",
                     }}
                   >
-                    {tokensByPage[activePage.index].map((tok, i) =>
-                      tok.kind === "space" ? (
-                        <span key={`s${i}`}>{tok.text}</span>
-                      ) : (
+                    {tokensByPage[activePage.index].map((tok, i) => {
+                      if (tok.kind === "space") {
+                        const bothOn =
+                          tok.prevWord != null &&
+                          tok.nextWord != null &&
+                          isHighlighted(activePage.index, tok.prevWord) &&
+                          isHighlighted(activePage.index, tok.nextWord);
+                        return (
+                          <span
+                            key={`s${i}`}
+                            className={bothOn ? "ocr-space--on" : undefined}
+                          >
+                            {tok.text}
+                          </span>
+                        );
+                      }
+                      const on = isHighlighted(activePage.index, tok.idx);
+                      const prevOn =
+                        tok.idx > 0 &&
+                        isHighlighted(activePage.index, tok.idx - 1);
+                      const nextOn = isHighlighted(
+                        activePage.index,
+                        tok.idx + 1,
+                      );
+                      const isStart = on && !prevOn;
+                      const isEnd = on && !nextOn;
+                      return (
                         <span
                           key={`w${tok.idx}`}
                           data-word-idx={tok.idx}
-                          className={`ocr-word rounded-[4px] ${
-                            isHighlighted(activePage.index, tok.idx)
-                              ? "ocr-word--on"
-                              : ""
+                          className={`ocr-word ${
+                            on ? "ocr-word--on" : ""
+                          } ${isStart ? "ocr-word--start" : ""} ${
+                            isEnd ? "ocr-word--end" : ""
                           }`}
                         >
                           {tok.text}
                         </span>
-                      ),
-                    )}
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-center text-sm italic text-[color:var(--ink-soft)]">
@@ -524,16 +569,33 @@ export default function OcrSheet({
           }
           .ocr-word {
             display: inline;
-            padding: 1px 1px;
             background-color: transparent;
-            transition: background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
-                        color 140ms cubic-bezier(0.22, 1, 0.36, 1);
+            transition: background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+                        color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+                        box-shadow 160ms cubic-bezier(0.22, 1, 0.36, 1);
             cursor: pointer;
           }
-          .ocr-word--on {
-            background-color: color-mix(in oklab, var(--accent) 28%, transparent);
-            box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 28%, transparent);
+          .ocr-word--on,
+          .ocr-space--on {
+            background-color: color-mix(in oklab, var(--accent) 24%, transparent);
             color: var(--ink);
+          }
+          /* clear start marker: thick vertical accent line on the left edge */
+          .ocr-word--start {
+            box-shadow: inset 3px 0 0 0 var(--accent);
+            border-top-left-radius: 4px;
+            border-bottom-left-radius: 4px;
+          }
+          /* clear end marker: thick vertical accent line on the right edge */
+          .ocr-word--end {
+            box-shadow: inset -3px 0 0 0 var(--accent);
+            border-top-right-radius: 4px;
+            border-bottom-right-radius: 4px;
+          }
+          /* range of exactly one word: both sides get markers */
+          .ocr-word--start.ocr-word--end {
+            box-shadow: inset 3px 0 0 0 var(--accent),
+                        inset -3px 0 0 0 var(--accent);
           }
         `}</style>
       </div>
