@@ -87,8 +87,18 @@ export default function BookView({
 
   // OCR
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const [photoQueue, setPhotoQueue] = useState<File[]>([]);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [ocrFiles, setOcrFiles] = useState<File[]>([]);
   const [ocrOpen, setOcrOpen] = useState(false);
+
+  // Cleanup blob URLs on unmount or when queue changes
+  useEffect(() => {
+    return () => {
+      photoPreviews.forEach((u) => URL.revokeObjectURL(u));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/books/${bookId}`, { cache: "no-store" });
@@ -314,9 +324,35 @@ export default function BookView({
   function onCameraPicked(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
-    setOcrFiles(files);
-    setOcrOpen(true);
+    const previews = files.map((f) => URL.createObjectURL(f));
+    setPhotoQueue((prev) => [...prev, ...files]);
+    setPhotoPreviews((prev) => [...prev, ...previews]);
     e.target.value = "";
+  }
+
+  function openPhotoPicker() {
+    cameraInputRef.current?.click();
+  }
+
+  function removePhotoAt(idx: number) {
+    setPhotoQueue((prev) => prev.filter((_, i) => i !== idx));
+    setPhotoPreviews((prev) => {
+      const toRevoke = prev[idx];
+      if (toRevoke) URL.revokeObjectURL(toRevoke);
+      return prev.filter((_, i) => i !== idx);
+    });
+  }
+
+  function clearPhotoQueue() {
+    photoPreviews.forEach((u) => URL.revokeObjectURL(u));
+    setPhotoPreviews([]);
+    setPhotoQueue([]);
+  }
+
+  function startOcr() {
+    if (photoQueue.length === 0) return;
+    setOcrFiles(photoQueue);
+    setOcrOpen(true);
   }
 
   async function saveOcrSelection({
@@ -604,7 +640,108 @@ export default function BookView({
             </p>
           </div>
         ) : (
-          <div className="flex items-center gap-2 px-4 py-4">
+          <div className="flex flex-col">
+            {tab === "underlines" && photoQueue.length > 0 && (
+              <div
+                className="fade-up flex flex-col gap-2 border-b hairline bg-[color:var(--paper)]/50 px-4 py-3"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
+                    담을 사진 · {photoQueue.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearPhotoQueue}
+                    className="text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)] hover:text-[color:var(--danger)]"
+                  >
+                    모두 지우기
+                  </button>
+                </div>
+
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {photoPreviews.map((src, i) => (
+                    <div
+                      key={i}
+                      className="relative h-20 w-16 shrink-0 overflow-hidden rounded-md border hairline bg-[color:var(--paper-2)]"
+                      style={{
+                        animation:
+                          "thumb-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both",
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={src}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removePhotoAt(i)}
+                        aria-label="이 사진 지우기"
+                        className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[color:var(--ink)]/75 text-[10px] text-[color:var(--paper)] backdrop-blur-sm"
+                      >
+                        ✕
+                      </button>
+                      <span className="absolute bottom-0 left-0 right-0 bg-[color:var(--ink)]/60 text-center text-[9px] text-[color:var(--paper)]">
+                        {i + 1}
+                      </span>
+                    </div>
+                  ))}
+
+                  {/* + add more */}
+                  <button
+                    type="button"
+                    onClick={openPhotoPicker}
+                    aria-label="사진 더 담기"
+                    className="flex h-20 w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed hairline text-[color:var(--ink-muted)] hover:text-[color:var(--accent)] hover:border-[color:var(--accent)]"
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 18 18"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                    >
+                      <path d="M9 4v10M4 9h10" />
+                    </svg>
+                    <span className="text-[9px] uppercase tracking-wider">
+                      더
+                    </span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={startOcr}
+                  className="mt-1 flex items-center justify-center gap-2 rounded-full px-4 py-2 text-[12px] tracking-wide text-[color:var(--paper)]"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, var(--accent) 0%, var(--accent-soft) 100%)",
+                    boxShadow:
+                      "0 4px 14px -4px color-mix(in oklab, var(--accent) 40%, transparent)",
+                  }}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M2.5 3h11v10h-11z" />
+                    <path d="M5 6.5h6M5 9.5h4" />
+                  </svg>
+                  <span>문장 찾기</span>
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 px-4 py-4">
             <textarea
               ref={textRef}
               value={textDraft}
@@ -715,6 +852,7 @@ export default function BookView({
                 </svg>
               </button>
             )}
+            </div>
           </div>
         )}
       </section>
@@ -851,6 +989,7 @@ export default function BookView({
         onClose={() => {
           setOcrOpen(false);
           setOcrFiles([]);
+          clearPhotoQueue();
         }}
         onPicked={saveOcrSelection}
       />
