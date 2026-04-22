@@ -23,6 +23,8 @@ type Token =
       nextWord: number | null;
     };
 
+type Range = { start: number; end: number };
+
 function tokenize(text: string): Token[] {
   if (!text) return [];
   const parts = text.split(/(\s+)/g).filter(Boolean);
@@ -53,30 +55,34 @@ function tokenize(text: string): Token[] {
   return out;
 }
 
-function buildSelectedText(tokens: Token[], selected: Set<number>): string {
-  let result = "";
-  let lastWasSelected = false;
-  let pendingSpace = "";
-  for (const t of tokens) {
-    if (t.kind === "space") {
-      if (lastWasSelected) pendingSpace += t.text;
-    } else {
-      if (selected.has(t.idx)) {
-        if (!lastWasSelected && result.length > 0) {
-          result += " ";
-        } else {
-          result += pendingSpace.replace(/\s+/g, " ");
-        }
-        result += t.text;
-        lastWasSelected = true;
-        pendingSpace = "";
-      } else {
-        lastWasSelected = false;
-        pendingSpace = "";
-      }
+/** Find the initial range: words up to the first sentence terminator. */
+function firstSentenceRange(tokens: Token[]): Range | null {
+  const words = tokens.filter((t) => t.kind === "word") as Extract<
+    Token,
+    { kind: "word" }
+  >[];
+  if (words.length === 0) return null;
+  for (let i = 0; i < words.length; i++) {
+    if (/[.!?。…]$/.test(words[i].text)) {
+      return { start: 0, end: i };
     }
   }
-  return result.trim();
+  return { start: 0, end: Math.min(14, words.length - 1) };
+}
+
+function buildSelectedText(
+  tokens: Token[],
+  range: Range | null | undefined,
+): string {
+  if (!range) return "";
+  const parts: string[] = [];
+  for (const t of tokens) {
+    if (t.kind !== "word") continue;
+    if (t.idx >= range.start && t.idx <= range.end) {
+      parts.push(t.text);
+    }
+  }
+  return parts.join(" ").trim();
 }
 
 export default function OcrPage({ bookId }: { bookId: string }) {
@@ -88,29 +94,12 @@ export default function OcrPage({ bookId }: { bookId: string }) {
     | { kind: "error"; message: string }
   >({ kind: "idle" });
   const [activeIdx, setActiveIdx] = useState(0);
-  const [pageSelections, setPageSelections] = useState<
-    Record<number, Set<number>>
-  >({});
-  const [dragState, setDragState] = useState<{
-    pageIdx: number;
-    start: number;
-    current: number;
-    mode: "add" | "remove";
-  } | null>(null);
+  const [ranges, setRanges] = useState<Record<number, Range>>({});
+  const [dragging, setDragging] = useState<null | "start" | "end">(null);
   const [pageOverride, setPageOverride] = useState<string>("");
   const [saving, setSaving] = useState(false);
-  const [pressingWord, setPressingWord] = useState<number | null>(null);
   const viewerRef = useRef<HTMLDivElement | null>(null);
-  const longPressTimerRef = useRef<number | null>(null);
-  const pendingRef = useRef<{
-    pageIdx: number;
-    wordIdx: number;
-    x: number;
-    y: number;
-    pointerId: number;
-  } | null>(null);
 
-  // On mount: consume queued files, run OCR
   useEffect(() => {
     const files = consumeOcrFiles(bookId);
     if (!files || files.length === 0) {
@@ -167,6 +156,20 @@ export default function OcrPage({ bookId }: { bookId: string }) {
     return map;
   }, [state]);
 
+  // Initialize ranges once tokens are ready
+  useEffect(() => {
+    if (state.kind !== "done") return;
+    const init: Record<number, Range> = {};
+    for (const p of state.pages) {
+      const tokens = tokensByPage[p.index];
+      if (!tokens) continue;
+      const r = firstSentenceRange(tokens);
+      if (r) init[p.index] = r;
+    }
+    setRanges(init);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.kind, tokensByPage]);
+
   function wordIdxFromPoint(x: number, y: number): number | null {
     const el = document.elementFromPoint(x, y) as HTMLElement | null;
     if (!el) return null;
@@ -176,124 +179,76 @@ export default function OcrPage({ bookId }: { bookId: string }) {
     return Number.isFinite(n) ? n : null;
   }
 
-  function startDrag(pageIdx: number, wordIdx: number) {
-    const existing = pageSelections[pageIdx] ?? new Set<number>();
-    const mode: "add" | "remove" = existing.has(wordIdx) ? "remove" : "add";
-    setDragState({ pageIdx, start: wordIdx, current: wordIdx, mode });
-  }
-
-  function activateDrag(pointerTarget: Element, pointerId: number) {
-    if (!pendingRef.current) return;
-    const { pageIdx, wordIdx } = pendingRef.current;
-    startDrag(pageIdx, wordIdx);
-    try {
-      pointerTarget.setPointerCapture?.(pointerId);
-    } catch {
-      // ignore
-    }
-    if (viewerRef.current) viewerRef.current.style.touchAction = "none";
-    if (navigator.vibrate) {
-      try {
-        navigator.vibrate(10);
-      } catch {
-        // ignore
-      }
-    }
-    setPressingWord(null);
-  }
-
-  function cancelPending() {
-    if (longPressTimerRef.current) {
-      window.clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    pendingRef.current = null;
-    setPressingWord(null);
-  }
-
-  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (state.kind !== "done") return;
+  // Global pointer tracking while dragging a handle
+  useEffect(() => {
+    if (!dragging) return;
     const pageIdx = activePage?.index;
     if (pageIdx == null) return;
-    const idx = wordIdxFromPoint(e.clientX, e.clientY);
-    if (idx == null) return;
-    const target = e.target as Element;
-    const pointerId = e.pointerId;
-    pendingRef.current = {
-      pageIdx,
-      wordIdx: idx,
-      x: e.clientX,
-      y: e.clientY,
-      pointerId,
-    };
-    if (e.pointerType === "mouse" || e.pointerType === "pen") {
-      activateDrag(target, pointerId);
-      return;
-    }
-    setPressingWord(idx);
-    longPressTimerRef.current = window.setTimeout(() => {
-      longPressTimerRef.current = null;
-      if (pendingRef.current) activateDrag(target, pointerId);
-    }, 300);
-  }
+    const lockedPageIdx: number = pageIdx;
 
-  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (dragState) {
+    function onMove(e: PointerEvent) {
       const idx = wordIdxFromPoint(e.clientX, e.clientY);
-      if (idx != null && idx !== dragState.current) {
-        setDragState({ ...dragState, current: idx });
-      }
+      if (idx == null) return;
+      setRanges((prev) => {
+        const cur = prev[lockedPageIdx];
+        if (!cur) return prev;
+        if (dragging === "start") {
+          const start = Math.max(0, Math.min(idx, cur.end));
+          if (start === cur.start) return prev;
+          return { ...prev, [lockedPageIdx]: { ...cur, start } };
+        }
+        const end = Math.max(cur.start, idx);
+        if (end === cur.end) return prev;
+        return { ...prev, [lockedPageIdx]: { ...cur, end } };
+      });
       e.preventDefault();
-      return;
     }
-    const pending = pendingRef.current;
-    if (!pending) return;
-    const dx = e.clientX - pending.x;
-    const dy = e.clientY - pending.y;
-    if (Math.hypot(dx, dy) > 8) cancelPending();
-  }
+    function onUp() {
+      setDragging(null);
+    }
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragging]);
 
-  function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    cancelPending();
-    if (viewerRef.current) viewerRef.current.style.touchAction = "";
-    if (!dragState) return;
-    try {
-      (e.target as Element).releasePointerCapture?.(e.pointerId);
-    } catch {
-      // ignore
-    }
-    const { pageIdx, start, current, mode } = dragState;
-    const lo = Math.min(start, current);
-    const hi = Math.max(start, current);
-    setPageSelections((prev) => {
-      const cur = new Set(prev[pageIdx] ?? []);
-      for (let i = lo; i <= hi; i++) {
-        if (mode === "add") cur.add(i);
-        else cur.delete(i);
+  function handleDown(which: "start" | "end") {
+    return (e: React.PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDragging(which);
+      if (navigator.vibrate) {
+        try {
+          navigator.vibrate(6);
+        } catch {
+          // ignore
+        }
       }
-      return { ...prev, [pageIdx]: cur };
-    });
-    setDragState(null);
+    };
   }
 
-  function onPointerCancel(e: React.PointerEvent<HTMLDivElement>) {
-    cancelPending();
-    if (viewerRef.current) viewerRef.current.style.touchAction = "";
-    if (dragState) onPointerUp(e);
-  }
-
-  function clearCurrentPageSelection() {
+  function clearCurrentPage() {
     const pageIdx = activePage?.index;
     if (pageIdx == null) return;
-    setPageSelections((prev) => {
+    setRanges((prev) => {
       const next = { ...prev };
       delete next[pageIdx];
       return next;
     });
   }
 
-  function clearAllSelections() {
-    setPageSelections({});
+  function resetCurrentPage() {
+    const pageIdx = activePage?.index;
+    if (pageIdx == null) return;
+    const tokens = tokensByPage[pageIdx];
+    if (!tokens) return;
+    const r = firstSentenceRange(tokens);
+    if (r) setRanges((prev) => ({ ...prev, [pageIdx]: r }));
   }
 
   const activePage = useMemo(() => {
@@ -306,21 +261,18 @@ export default function OcrPage({ bookId }: { bookId: string }) {
     const parts: string[] = [];
     for (const page of state.pages) {
       const tokens = tokensByPage[page.index];
-      const sel = pageSelections[page.index];
-      if (!tokens || !sel || sel.size === 0) continue;
-      const s = buildSelectedText(tokens, sel);
+      const r = ranges[page.index];
+      if (!tokens || !r) continue;
+      const s = buildSelectedText(tokens, r);
       if (s) parts.push(s);
     }
     return parts.join("\n\n");
-  }, [state, tokensByPage, pageSelections]);
+  }, [state, tokensByPage, ranges]);
 
-  const totalSelectedCount = useMemo(() => {
-    let n = 0;
-    for (const k of Object.keys(pageSelections)) {
-      n += pageSelections[Number(k)]?.size ?? 0;
-    }
-    return n;
-  }, [pageSelections]);
+  const selectedPagesCount = useMemo(
+    () => Object.keys(ranges).length,
+    [ranges],
+  );
 
   const effectivePage = useMemo(() => {
     const override = pageOverride.trim();
@@ -330,22 +282,11 @@ export default function OcrPage({ bookId }: { bookId: string }) {
     }
     if (state.kind === "done") {
       for (const p of state.pages) {
-        const sel = pageSelections[p.index];
-        if (sel && sel.size > 0 && p.page != null) return p.page;
+        if (ranges[p.index] && p.page != null) return p.page;
       }
     }
     return activePage?.page ?? null;
-  }, [pageOverride, activePage, state, pageSelections]);
-
-  function isHighlighted(pageIdx: number, wordIdx: number): boolean {
-    const committed = pageSelections[pageIdx]?.has(wordIdx) ?? false;
-    if (!dragState || dragState.pageIdx !== pageIdx) return committed;
-    const lo = Math.min(dragState.start, dragState.current);
-    const hi = Math.max(dragState.start, dragState.current);
-    const inRange = wordIdx >= lo && wordIdx <= hi;
-    if (dragState.mode === "add") return committed || inRange;
-    return committed && !inRange;
-  }
+  }, [pageOverride, activePage, state, ranges]);
 
   async function handleSave() {
     if (!combinedText) return;
@@ -402,7 +343,9 @@ export default function OcrPage({ bookId }: { bookId: string }) {
             사진에서 문장 담기
           </span>
           <span className="serif text-[13px] text-[color:var(--ink)]">
-            {state.kind !== "done" ? "잠시만요" : "꾹 눌러 드래그"}
+            {state.kind !== "done"
+              ? "잠시만요"
+              : "양 끝을 잡고 늘리거나 줄이세요"}
           </span>
         </div>
         <div className="h-9 w-9" />
@@ -438,7 +381,7 @@ export default function OcrPage({ bookId }: { bookId: string }) {
             {state.pages.length > 1 && (
               <div className="flex shrink-0 gap-2 overflow-x-auto border-b hairline bg-[color:var(--paper-2)] px-5 py-3">
                 {state.pages.map((p, i) => {
-                  const count = pageSelections[p.index]?.size ?? 0;
+                  const selected = !!ranges[p.index];
                   return (
                     <button
                       key={i}
@@ -453,9 +396,7 @@ export default function OcrPage({ bookId }: { bookId: string }) {
                       <span>
                         {p.page != null ? `p. ${p.page}` : `사진 ${i + 1}`}
                       </span>
-                      {count > 0 && (
-                        <span className="ml-1 opacity-80">· {count}</span>
-                      )}
+                      {selected && <span className="ml-1 opacity-80">·</span>}
                     </button>
                   );
                 })}
@@ -464,16 +405,12 @@ export default function OcrPage({ bookId }: { bookId: string }) {
 
             <div
               ref={viewerRef}
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onPointerCancel={onPointerCancel}
               className="min-h-0 flex-1 overflow-y-auto px-5 py-5"
               style={{
                 WebkitUserSelect: "none",
                 userSelect: "none",
                 WebkitTouchCallout: "none",
-                touchAction: "pan-y",
+                touchAction: dragging ? "none" : "pan-y",
               }}
             >
               {activePage?.error ? (
@@ -482,52 +419,16 @@ export default function OcrPage({ bookId }: { bookId: string }) {
                 </p>
               ) : activePage && tokensByPage[activePage.index]?.length ? (
                 <div
-                  className="prose-reading whitespace-pre-wrap break-keep leading-8"
+                  className="prose-reading whitespace-pre-wrap break-keep leading-9"
                   style={{
                     fontFamily: "var(--font-serif-book), Georgia, serif",
                   }}
                 >
-                  {tokensByPage[activePage.index].map((tok, i) => {
-                    if (tok.kind === "space") {
-                      const bothOn =
-                        tok.prevWord != null &&
-                        tok.nextWord != null &&
-                        isHighlighted(activePage.index, tok.prevWord) &&
-                        isHighlighted(activePage.index, tok.nextWord);
-                      return (
-                        <span
-                          key={`s${i}`}
-                          className={bothOn ? "ocr-space--on" : undefined}
-                        >
-                          {tok.text}
-                        </span>
-                      );
-                    }
-                    const on = isHighlighted(activePage.index, tok.idx);
-                    const prevOn =
-                      tok.idx > 0 &&
-                      isHighlighted(activePage.index, tok.idx - 1);
-                    const nextOn = isHighlighted(
-                      activePage.index,
-                      tok.idx + 1,
-                    );
-                    const isStart = on && !prevOn;
-                    const isEnd = on && !nextOn;
-                    const isPressing = pressingWord === tok.idx;
-                    return (
-                      <span
-                        key={`w${tok.idx}`}
-                        data-word-idx={tok.idx}
-                        className={`ocr-word ocr-word--selectable ${
-                          on ? "ocr-word--on" : ""
-                        } ${isStart ? "ocr-word--start" : ""} ${
-                          isEnd ? "ocr-word--end" : ""
-                        } ${isPressing ? "ocr-word--press" : ""}`}
-                      >
-                        {tok.text}
-                      </span>
-                    );
-                  })}
+                  {renderTokens(
+                    tokensByPage[activePage.index],
+                    ranges[activePage.index],
+                    handleDown,
+                  )}
                 </div>
               ) : (
                 <p className="text-center text-sm italic text-[color:var(--ink-soft)]">
@@ -540,29 +441,29 @@ export default function OcrPage({ bookId }: { bookId: string }) {
       </main>
 
       {state.kind === "done" && (
-        <footer className="flex shrink-0 flex-col gap-2.5 border-t hairline bg-[color:var(--paper-2)] px-5 py-3">
+        <footer className="flex shrink-0 flex-col gap-2 border-t hairline bg-[color:var(--paper-2)] px-5 py-3">
           <div className="flex items-center gap-3">
             <span className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--ink-soft)]">
-              담긴 문장
+              담긴 문장 · {selectedPagesCount}페이지
             </span>
             <div className="h-px flex-1 bg-[color:var(--rule)]" />
-            {totalSelectedCount > 0 && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={clearCurrentPageSelection}
-                  className="text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)] hover:text-[color:var(--ink)]"
-                >
-                  이 페이지 지우기
-                </button>
-                <button
-                  type="button"
-                  onClick={clearAllSelections}
-                  className="text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)] hover:text-[color:var(--danger)]"
-                >
-                  전부 지우기
-                </button>
-              </div>
+            {activePage && ranges[activePage.index] && (
+              <button
+                type="button"
+                onClick={resetCurrentPage}
+                className="text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)] hover:text-[color:var(--ink)]"
+              >
+                첫 문장으로
+              </button>
+            )}
+            {activePage && ranges[activePage.index] && (
+              <button
+                type="button"
+                onClick={clearCurrentPage}
+                className="text-[10px] uppercase tracking-wider text-[color:var(--ink-soft)] hover:text-[color:var(--danger)]"
+              >
+                이 페이지 빼기
+              </button>
             )}
           </div>
 
@@ -575,7 +476,7 @@ export default function OcrPage({ bookId }: { bookId: string }) {
             </blockquote>
           ) : (
             <p className="px-1 text-[12px] italic text-[color:var(--ink-soft)]">
-              단어 위를 꾹 누른 뒤 드래그해서 담을 부분을 고르세요.
+              담긴 문장이 없어요. 탭에서 페이지를 골라 양 끝을 잡고 늘려 보세요.
             </p>
           )}
 
@@ -613,38 +514,136 @@ export default function OcrPage({ bookId }: { bookId: string }) {
           display: inline;
           background-color: transparent;
           transition: background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
-                      color 160ms cubic-bezier(0.22, 1, 0.36, 1),
-                      box-shadow 160ms cubic-bezier(0.22, 1, 0.36, 1);
-        }
-        .ocr-word--selectable { cursor: pointer; }
-        .ocr-word--press {
-          background-color: color-mix(in oklab, var(--accent) 14%, transparent);
-          animation: word-press 300ms cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        @keyframes word-press {
-          from { background-color: transparent; }
-          to { background-color: color-mix(in oklab, var(--accent) 14%, transparent); }
+                      color 160ms cubic-bezier(0.22, 1, 0.36, 1);
         }
         .ocr-word--on,
         .ocr-space--on {
           background-color: color-mix(in oklab, var(--accent) 24%, transparent);
           color: var(--ink);
         }
-        .ocr-word--start {
-          box-shadow: inset 3px 0 0 0 var(--accent);
-          border-top-left-radius: 4px;
-          border-bottom-left-radius: 4px;
+
+        .ocr-handle {
+          position: relative;
+          display: inline-block;
+          width: 18px;
+          height: 1.5em;
+          vertical-align: middle;
+          cursor: grab;
+          touch-action: none;
+          user-select: none;
+          -webkit-user-select: none;
+          -webkit-touch-callout: none;
         }
-        .ocr-word--end {
-          box-shadow: inset -3px 0 0 0 var(--accent);
-          border-top-right-radius: 4px;
-          border-bottom-right-radius: 4px;
+        .ocr-handle:active { cursor: grabbing; }
+        .ocr-handle::before {
+          /* vertical line at the boundary */
+          content: "";
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          width: 2.5px;
+          background: var(--accent);
+          border-radius: 1.25px;
         }
-        .ocr-word--start.ocr-word--end {
-          box-shadow: inset 3px 0 0 0 var(--accent),
-                      inset -3px 0 0 0 var(--accent);
+        .ocr-handle::after {
+          /* round pull grip */
+          content: "";
+          position: absolute;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: var(--accent);
+          box-shadow:
+            0 2px 8px -2px rgba(70, 50, 20, 0.55),
+            inset 0 1px 1px rgba(255, 255, 255, 0.2);
+        }
+        .ocr-handle--start::before {
+          left: 8px;
+        }
+        .ocr-handle--start::after {
+          left: 1px;
+          top: -8px;
+          animation: handle-pulse 2s ease-in-out infinite;
+        }
+        .ocr-handle--end::before {
+          right: 8px;
+        }
+        .ocr-handle--end::after {
+          right: 1px;
+          bottom: -8px;
+          animation: handle-pulse 2s ease-in-out 1s infinite;
+        }
+        @keyframes handle-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 35%, transparent),
+                                 0 2px 8px -2px rgba(70, 50, 20, 0.55),
+                                 inset 0 1px 1px rgba(255, 255, 255, 0.2); }
+          50%      { box-shadow: 0 0 0 7px color-mix(in oklab, var(--accent) 0%, transparent),
+                                 0 2px 8px -2px rgba(70, 50, 20, 0.55),
+                                 inset 0 1px 1px rgba(255, 255, 255, 0.2); }
         }
       `}</style>
     </div>
   );
+}
+
+function renderTokens(
+  tokens: Token[],
+  range: Range | undefined,
+  handleDown: (which: "start" | "end") => (e: React.PointerEvent) => void,
+): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const tok = tokens[i];
+    if (tok.kind === "space") {
+      const bothOn =
+        range != null &&
+        tok.prevWord != null &&
+        tok.nextWord != null &&
+        tok.prevWord >= range.start &&
+        tok.prevWord <= range.end &&
+        tok.nextWord >= range.start &&
+        tok.nextWord <= range.end;
+      out.push(
+        <span key={`s${i}`} className={bothOn ? "ocr-space--on" : undefined}>
+          {tok.text}
+        </span>,
+      );
+      continue;
+    }
+    const on = range != null && tok.idx >= range.start && tok.idx <= range.end;
+    // start handle goes BEFORE the start word
+    if (range && tok.idx === range.start) {
+      out.push(
+        <span
+          key={`hs-${tok.idx}`}
+          className="ocr-handle ocr-handle--start"
+          role="slider"
+          aria-label="시작 위치"
+          onPointerDown={handleDown("start")}
+        />,
+      );
+    }
+    out.push(
+      <span
+        key={`w${tok.idx}`}
+        data-word-idx={tok.idx}
+        className={`ocr-word ${on ? "ocr-word--on" : ""}`}
+      >
+        {tok.text}
+      </span>,
+    );
+    // end handle goes AFTER the end word
+    if (range && tok.idx === range.end) {
+      out.push(
+        <span
+          key={`he-${tok.idx}`}
+          className="ocr-handle ocr-handle--end"
+          role="slider"
+          aria-label="끝 위치"
+          onPointerDown={handleDown("end")}
+        />,
+      );
+    }
+  }
+  return out;
 }
