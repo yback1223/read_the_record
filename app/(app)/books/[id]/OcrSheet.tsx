@@ -114,6 +114,7 @@ export default function OcrSheet({
     current: number;
     mode: "add" | "remove";
   } | null>(null);
+  const [mode, setMode] = useState<"read" | "select">("read");
   const [pageOverride, setPageOverride] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const viewerRef = useRef<HTMLDivElement | null>(null);
@@ -200,12 +201,17 @@ export default function OcrSheet({
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (mode !== "select") return;
     if (state.kind !== "done") return;
     const pageIdx = activePage?.index;
     if (pageIdx == null) return;
     const idx = wordIdxFromPoint(e.clientX, e.clientY);
     if (idx == null) return;
-    (e.target as Element).setPointerCapture?.(e.pointerId);
+    try {
+      (e.target as Element).setPointerCapture?.(e.pointerId);
+    } catch {
+      // ignore
+    }
     e.preventDefault();
     startDrag(pageIdx, idx);
   }
@@ -213,10 +219,10 @@ export default function OcrSheet({
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
     if (!dragState) return;
     const idx = wordIdxFromPoint(e.clientX, e.clientY);
-    if (idx == null) return;
-    if (idx !== dragState.current) {
+    if (idx != null && idx !== dragState.current) {
       setDragState({ ...dragState, current: idx });
     }
+    e.preventDefault();
   }
 
   function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
@@ -226,13 +232,13 @@ export default function OcrSheet({
     } catch {
       // ignore
     }
-    const { pageIdx, start, current, mode } = dragState;
+    const { pageIdx, start, current, mode: dragMode } = dragState;
     const lo = Math.min(start, current);
     const hi = Math.max(start, current);
     setPageSelections((prev) => {
       const cur = new Set(prev[pageIdx] ?? []);
       for (let i = lo; i <= hi; i++) {
-        if (mode === "add") cur.add(i);
+        if (dragMode === "add") cur.add(i);
         else cur.delete(i);
       }
       return { ...prev, [pageIdx]: cur };
@@ -352,19 +358,46 @@ export default function OcrSheet({
               사진에서 문장 담기
             </span>
             <span className="serif text-[15px] text-[color:var(--ink)]">
-              {state.kind === "done"
-                ? "단어 위를 드래그해서 담을 문장을 고르세요"
-                : "잠시만요"}
+              {state.kind !== "done"
+                ? "잠시만요"
+                : mode === "read"
+                  ? "내용을 쭉 읽어보세요"
+                  : "담을 부분을 드래그로 고르세요"}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="닫기"
-            className="flex h-8 w-8 items-center justify-center rounded-full border hairline text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            {state.kind === "done" && (
+              <button
+                type="button"
+                onClick={() =>
+                  setMode((m) => (m === "read" ? "select" : "read"))
+                }
+                className="rounded-full px-3 py-1.5 text-[11px] uppercase tracking-wider disabled:opacity-50"
+                style={
+                  mode === "select"
+                    ? {
+                        background: "var(--accent)",
+                        color: "var(--paper)",
+                      }
+                    : {
+                        background: "transparent",
+                        color: "var(--ink-muted)",
+                        border: "1px solid var(--rule)",
+                      }
+                }
+              >
+                {mode === "select" ? "고르기 완료" : "고르기 시작"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="닫기"
+              className="flex h-8 w-8 items-center justify-center rounded-full border hairline text-[color:var(--ink-muted)] hover:text-[color:var(--ink)]"
+            >
+              ✕
+            </button>
+          </div>
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
@@ -423,12 +456,17 @@ export default function OcrSheet({
 
               <div
                 ref={viewerRef}
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={onPointerUp}
-                onPointerCancel={onPointerUp}
-                className="select-none px-5 py-6 touch-none"
-                style={{ WebkitUserSelect: "none", userSelect: "none" }}
+                onPointerDown={mode === "select" ? onPointerDown : undefined}
+                onPointerMove={mode === "select" ? onPointerMove : undefined}
+                onPointerUp={mode === "select" ? onPointerUp : undefined}
+                onPointerCancel={mode === "select" ? onPointerUp : undefined}
+                className="px-5 py-6"
+                style={{
+                  WebkitUserSelect: "none",
+                  userSelect: "none",
+                  WebkitTouchCallout: "none",
+                  touchAction: mode === "select" ? "none" : "pan-y",
+                }}
               >
                 {activePage?.error ? (
                   <p className="text-center text-sm italic text-[color:var(--danger)]">
@@ -472,10 +510,10 @@ export default function OcrSheet({
                           key={`w${tok.idx}`}
                           data-word-idx={tok.idx}
                           className={`ocr-word ${
-                            on ? "ocr-word--on" : ""
-                          } ${isStart ? "ocr-word--start" : ""} ${
-                            isEnd ? "ocr-word--end" : ""
-                          }`}
+                            mode === "select" ? "ocr-word--selectable" : ""
+                          } ${on ? "ocr-word--on" : ""} ${
+                            isStart ? "ocr-word--start" : ""
+                          } ${isEnd ? "ocr-word--end" : ""}`}
                         >
                           {tok.text}
                         </span>
@@ -573,6 +611,8 @@ export default function OcrSheet({
             transition: background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
                         color 160ms cubic-bezier(0.22, 1, 0.36, 1),
                         box-shadow 160ms cubic-bezier(0.22, 1, 0.36, 1);
+          }
+          .ocr-word--selectable {
             cursor: pointer;
           }
           .ocr-word--on,
